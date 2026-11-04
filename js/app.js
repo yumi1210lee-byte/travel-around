@@ -3,9 +3,11 @@ import { closeSheet, openForm } from './forms.js';
 import * as fx from './fx.js';
 import { computeFx } from './fxview.js';
 import { createSampleTrip } from './sample.js';
+import { decodeTrip, extractPayload, openShareSheet } from './share.js';
 import * as store from './store.js';
+import { copyText, toast } from './ui.js';
 import { isDate, toDateStr } from './utils.js';
-import { renderFxPage, renderHome, renderSettings, renderTrip } from './views.js';
+import { renderFxPage, renderHome, renderSettings, renderShareImport, renderTrip } from './views.js';
 
 const app = document.getElementById('app');
 const FORM_OF = { flights: 'flight', stays: 'stay', plans: 'plan' };
@@ -17,6 +19,7 @@ function parseRoute() {
   if (parts[0] === 'trip' && parts[1]) return { name: 'trip', id: parts[1], tab: parts[2] || 'overview' };
   if (parts[0] === 'settings') return { name: 'settings' };
   if (parts[0] === 'fx') return { name: 'fx' };
+  if (parts[0] === 'share' && parts[1]) return { name: 'share', payload: parts[1] };
   return { name: 'home' };
 }
 
@@ -58,6 +61,30 @@ function updateFxFields({ both = false } = {}) {
   if (both || fxDraft.side === 'a') b.value = out.b;
 }
 
+/* ───────────── 收到的分享 ───────────── */
+
+let incoming = { payload: '', status: 'idle', trip: null };
+
+function loadIncoming(payload) {
+  if (incoming.payload === payload) return;
+  incoming = { payload, status: 'loading', trip: null };
+  decodeTrip(payload)
+    .then((trip) => {
+      if (incoming.payload !== payload) return;
+      incoming = { payload, status: 'ready', trip };
+      render();
+    })
+    .catch((err) => {
+      console.warn('分享連結無法讀取', err);
+      if (incoming.payload !== payload) return;
+      incoming = { payload, status: 'error', trip: null };
+      render();
+    });
+}
+
+const isStandalone = () =>
+  window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+
 let lastRouteKey = '';
 let restoringFocus = false;
 
@@ -80,6 +107,11 @@ function render() {
   } else if (route.name === 'fx') {
     app.innerHTML = renderFxPage(renderContext(null));
     document.title = `換匯・${APP_NAME}`;
+  } else if (route.name === 'share') {
+    loadIncoming(route.payload);
+    const existing = incoming.trip?.id ? store.getTrip(incoming.trip.id) : null;
+    app.innerHTML = renderShareImport(incoming, existing, { standalone: isStandalone(), href: location.href });
+    document.title = `收到分享的旅程・${APP_NAME}`;
   } else if (route.name === 'settings') {
     app.innerHTML = renderSettings(data);
     document.title = `設定・${APP_NAME}`;
@@ -110,33 +142,6 @@ function render() {
 }
 
 /* ───────────── 小工具 ───────────── */
-
-let toastTimer;
-function toast(message) {
-  const el = document.getElementById('toast');
-  el.textContent = message;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
-}
-
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast(`已複製 ${text}`);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.append(ta);
-    ta.select();
-    const ok = document.execCommand?.('copy');
-    ta.remove();
-    toast(ok ? `已複製 ${text}` : '無法複製，請長按文字手動複製');
-  }
-}
 
 function downloadFile(filename, text) {
   const blob = new Blob([text], { type: 'application/json' });
@@ -220,7 +225,29 @@ const actions = {
     });
   },
 
-  copy: (el) => copyText(el.dataset.text),
+  copy: (el) => copyText(el.dataset.text, el.dataset.label),
+
+  'share-trip': () => {
+    const trip = currentTrip();
+    if (trip) openShareSheet(trip, { toast, copyText });
+  },
+
+  'import-shared': (el) => {
+    if (incoming.status !== 'ready') return;
+    const { mode } = el.dataset;
+    const shared = incoming.trip;
+    const existing = shared.id ? store.getTrip(shared.id) : null;
+    // 自己建立的旅程不能被分享的版本蓋掉，只能另存
+    if (mode === 'replace' && !existing?.importedAt) return;
+    if (mode === 'new' && existing) return;
+    const trip =
+      mode === 'copy'
+        ? store.importTrip({ ...shared, name: `${shared.name}（副本）` }, { asCopy: true })
+        : store.importTrip(shared);
+    incoming = { payload: '', status: 'idle', trip: null };
+    location.replace(`#/trip/${encodeURIComponent(trip.id)}`);
+    toast(mode === 'replace' ? '已更新旅程' : '已加入你的旅程');
+  },
 
   'delete-check': (el) => {
     const trip = currentTrip();
@@ -336,6 +363,14 @@ app.addEventListener('change', (e) => {
 });
 
 app.addEventListener('submit', (e) => {
+  const sharePaste = e.target.closest('[data-form="share-paste"]');
+  if (sharePaste) {
+    e.preventDefault();
+    const payload = extractPayload(sharePaste.elements.link.value);
+    if (!payload) return toast('找不到分享連結，請貼上完整的連結');
+    location.hash = `#/share/${payload}`;
+    return;
+  }
   const form = e.target.closest('[data-form="checklist"]');
   if (!form) return;
   e.preventDefault();

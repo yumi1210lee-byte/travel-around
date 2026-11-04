@@ -191,6 +191,26 @@ export function importData(text) {
   return { added, updated };
 }
 
+/**
+ * 加入別人分享的旅程。asCopy 時用新的 id（另存一份），
+ * 否則沿用分享者的 id，之後收到更新的連結可以直接取代。
+ */
+export function importTrip(trip, { asCopy = false } = {}) {
+  const now = new Date().toISOString();
+  const incoming = normalizeTrip({
+    ...trip,
+    id: asCopy || !trip.id ? uid() : trip.id,
+    importedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+  const index = data.trips.findIndex((t) => t.id === incoming.id);
+  if (index >= 0) data.trips[index] = incoming;
+  else data.trips.push(incoming);
+  commit();
+  return incoming;
+}
+
 export function clearAll() {
   data = emptyData();
   commit();

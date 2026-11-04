@@ -2,6 +2,7 @@
 import { APP_NAME, APP_VERSION, CURRENCIES, CURRENCY_INFO, PLAN_CATEGORIES } from './constants.js';
 import { convert } from './fx.js';
 import { formatAmount, renderConverter } from './fxview.js';
+import { renderSharePreview } from './share.js';
 import { icon } from './icons.js';
 import {
   buildTimeline,
@@ -150,6 +151,7 @@ export function renderTrip(trip, tab, ctx) {
         <h1>${h(trip.emoji || '')} ${h(trip.name)}</h1>
         <p>${h(subtitle)}</p>
       </div>
+      <button class="icon-btn" data-action="share-trip" aria-label="分享旅程">${icon('share')}</button>
       <button class="icon-btn" data-action="edit-trip" aria-label="編輯旅程">${icon('edit')}</button>
     </header>
     <main class="page has-tabbar">${content}</main>
@@ -219,7 +221,7 @@ function timelineEntry(entry) {
       title = `退房 ${r.name}`;
       break;
     default:
-      emoji = CATEGORY[r.category]?.emoji || '📍';
+      emoji = (Object.hasOwn(CATEGORY, r.category) && CATEGORY[r.category].emoji) || '📍';
       title = r.title;
       sub = r.location;
   }
@@ -445,7 +447,7 @@ function stays(trip) {
 /* ── 行程 ── */
 
 function planItem(p) {
-  const cat = CATEGORY[p.category] || CATEGORY.other;
+  const cat = Object.hasOwn(CATEGORY, p.category) ? CATEGORY[p.category] : CATEGORY.other;
   return `<li class="plan">
     <button class="plan-main" data-action="edit" data-coll="plans" data-id="${h(p.id)}">
       <span class="plan-time">${h(p.time || '')}</span>
@@ -547,6 +549,15 @@ export function renderSettings(data) {
       </section>
 
       <section class="card">
+        <h2 class="card-title">匯入分享的旅程</h2>
+        <p class="muted small">收到別人的分享連結，但點開後沒有進到這個 App？把整段連結貼在這裡。</p>
+        <form class="add-row" data-form="share-paste">
+          <input name="link" placeholder="貼上分享連結" autocomplete="off" aria-label="分享連結" required>
+          <button class="btn primary" type="submit">開啟</button>
+        </form>
+      </section>
+
+      <section class="card">
         <h2 class="card-title">主要幣別</h2>
         <p class="muted small">新增航班、住宿、行程時預先帶入，也是花費換算的目標幣別。</p>
         <select data-change="currency" aria-label="預設幣別">
@@ -579,4 +590,25 @@ export function renderFxPage(ctx) {
       <div class="topbar-title"><h1>換匯</h1></div>
     </header>
     <main class="page">${renderConverter(ctx.fx, ctx.fxInput)}</main>`;
+}
+
+/* ───────────── 收到分享 ───────────── */
+
+export function renderShareImport(state, existing, env) {
+  let body;
+  if (state.status === 'ready') body = renderSharePreview(state.trip, existing, env);
+  else if (state.status === 'error') {
+    body = emptyState(
+      '🔗',
+      '無法讀取這個分享連結',
+      '連結可能不完整。請確認整段連結都有複製到，或請對方重新分享一次。',
+      '<a class="btn primary" href="#/">回到旅程列表</a>',
+    );
+  } else body = '<p class="muted center" style="padding:48px 0">讀取中…</p>';
+  return `
+    <header class="topbar">
+      <a class="icon-btn" href="#/" aria-label="回到旅程列表">${icon('back')}</a>
+      <div class="topbar-title"><h1>收到分享的旅程</h1></div>
+    </header>
+    <main class="page">${body}</main>`;
 }

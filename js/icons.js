@@ -9,6 +9,7 @@ const PATHS = {
   plus: '<path d="M5 12h14M12 5v14"/>',
   back: '<path d="m15 18-6-6 6-6"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
+  share: '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/>',
   settings:
     '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
   edit: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
