@@ -74,6 +74,8 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* 很長、沒有空格的地址或名稱也要能換行，不撐破版面 */
+  overflow-wrap: anywhere;
 }
 h1, h2, h3, p { margin: 0; }
 a { color: inherit; text-decoration: none; }
@@ -110,7 +112,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .section { margin-top: 12px; }
 .section-title { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; margin: 0 4px 8px; }
 .section-title.spaced { margin-top: 24px; }
-.stack { display: grid; gap: 12px; }
+/* minmax(0, 1fr)：卡片寬度不會被內容撐得比螢幕寬 */
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .stack.spaced { margin-top: 12px; }
 .row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
@@ -126,7 +129,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .stack > .card { margin-top: 0; }
 .card-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
 .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.card-head h3 { font-size: 17px; font-weight: 700; }
+.card-head h3 { min-width: 0; font-size: 17px; font-weight: 700; }
 .card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .notes { white-space: pre-wrap; font-size: 14px; color: var(--muted); margin-top: 10px; overflow-wrap: anywhere; }
 .price { margin-top: 10px; }
@@ -261,8 +264,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .day-num { font-weight: 800; color: var(--warm); }
 .day-date { font-weight: 600; }
 .day-empty { padding: 6px 4px; }
-.day-stay { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 8px 4px 2px; border-top: 1px dashed var(--border); font-size: 13px; color: var(--muted); }
-.day-stay .icon { width: 16px; height: 16px; }
+.day-stay { display: flex; align-items: flex-start; gap: 6px; margin-top: 4px; padding: 8px 4px 2px; border-top: 1px dashed var(--border); font-size: 13px; color: var(--muted); }
+.day-stay .icon { width: 16px; height: 16px; margin-top: 2px; }
 
 .tl { list-style: none; margin: 0; padding: 0; }
 .tl-item { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 8px 4px; border-radius: 10px; text-align: left; }
@@ -271,7 +274,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .tl-icon { width: 24px; flex: none; text-align: center; }
 .tl-body { flex: 1; min-width: 0; }
 .tl-body b { display: block; font-weight: 600; }
-.tl-body small { display: block; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-body small { display: block; font-size: 13px; color: var(--muted); }
 .kind-checkout .tl-body b, .kind-arrival .tl-body b { font-weight: 500; }
 
 /* ───────────── 航班（登機證樣式） ───────────── */
@@ -311,6 +314,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .nights { font-size: 13px; font-weight: 700; color: var(--warm); background: var(--warm-soft); padding: 4px 10px; border-radius: 999px; }
 .addr { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; color: var(--accent); font-size: 14px; }
 .addr .icon { width: 16px; height: 16px; margin-top: 2px; }
+.addr span { min-width: 0; }
 
 /* ───────────── 行程 ───────────── */
 .plan-group { margin-top: 16px; }
