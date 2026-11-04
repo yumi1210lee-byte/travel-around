@@ -6,7 +6,6 @@ import { renderSharePreview } from './share.js';
 import { icon } from './icons.js';
 import {
   buildTimeline,
-  dateRange,
   diffDays,
   escapeHtml as h,
   flightradarUrl,
@@ -21,7 +20,6 @@ import {
   nowLocal,
   safeUrl,
   sortFlights,
-  sortPlans,
   sortStays,
   splitDateTime,
   statusLabel,
@@ -230,17 +228,27 @@ function hero(trip, status) {
   }
 }
 
-function timelineEntry(entry) {
+/** 時間軸上每一項的圖示、標題與副標（總覽和行程分頁共用） */
+function entryInfo(entry) {
   const r = entry.ref;
   let emoji;
   let title;
   let sub;
   switch (entry.kind) {
-    case 'flight':
+    case 'flight': {
+      const [depDate] = splitDateTime(r.departAt);
+      const [arrDate, arrTime] = splitDateTime(r.arriveAt);
       emoji = '🛫';
       title = routeText(r);
-      sub = [normalizeFlightNo(r.flightNo), r.airline].filter(Boolean).join(' ');
+      sub = [
+        [normalizeFlightNo(r.flightNo), r.airline].filter(Boolean).join(' '),
+        arrTime && (!arrDate || arrDate === depDate) ? `${arrTime} 抵達` : '',
+        r.terminal ? `航廈 ${r.terminal}` : '',
+      ]
+        .filter(Boolean)
+        .join('・');
       break;
+    }
     case 'arrival':
       emoji = '🛬';
       title = `抵達 ${r.toCity || r.to || ''}`;
@@ -260,6 +268,12 @@ function timelineEntry(entry) {
       title = r.title;
       sub = r.location;
   }
+  return { emoji, title, sub };
+}
+
+function timelineEntry(entry) {
+  const r = entry.ref;
+  const { emoji, title, sub } = entryInfo(entry);
   return `<li><button class="tl-item kind-${entry.kind}" ${editAttrs(entry.coll, r.id)}>
     <span class="tl-time">${h(entry.time || '')}</span>
     <span class="tl-icon" aria-hidden="true">${emoji}</span>
@@ -540,11 +554,32 @@ function planItem(p) {
   </li>`;
 }
 
+/** 行程分頁裡自動帶入的航班、住宿（點了一樣可以編輯） */
+function linkedItem(entry) {
+  const r = entry.ref;
+  const { emoji, title, sub } = entryInfo(entry);
+  const tag = entry.coll === 'flights' ? '航班' : '住宿';
+  const map =
+    entry.kind === 'checkin' && r.address
+      ? `<a class="icon-btn sm" href="${mapsUrl(r.address)}" ${ext} aria-label="在地圖上查看 ${h(r.name)}">${icon('pin')}</a>`
+      : '';
+  return `<li class="plan is-linked kind-${entry.kind}">
+    <button class="plan-main" ${editAttrs(entry.coll, r.id)}>
+      <span class="plan-time">${h(entry.time || '')}</span>
+      <span class="plan-cat" aria-hidden="true">${emoji}</span>
+      <span class="plan-body"><b>${h(title)}</b>${sub ? `<small>${h(sub)}</small>` : ''}</span>
+      <span class="plan-tag">${tag}</span>
+    </button>
+    ${map}
+  </li>`;
+}
+
+const dayItem = (entry) => (entry.kind === 'plan' ? planItem(entry.ref) : linkedItem(entry));
+
 function plans(trip) {
-  const sorted = sortPlans(trip.plans);
-  const dates = new Set(dateRange(trip.startDate, trip.endDate));
-  for (const p of sorted) if (isDate(p.date)) dates.add(p.date);
-  if (!dates.size && !sorted.length) {
+  // 跟總覽一樣用時間軸：自己的行程之外，也自動排入航班與入住／退房
+  const timeline = buildTimeline(trip);
+  if (!timeline.days.length && !timeline.undated.length) {
     return emptyState(
       '🗺️',
       '還沒有行程',
@@ -553,21 +588,23 @@ function plans(trip) {
     );
   }
   const today = toDateStr();
-  const groups = [...dates].sort().map((date) => {
-    const items = sorted.filter((p) => p.date === date);
+  const groups = timeline.days.map(({ date, items, stays }) => {
+    const tonight = stays.length
+      ? `<p class="plan-stay">${icon('bed')}<span>今晚住：${stays.map((s) => h(s.name)).join('、')}</span></p>`
+      : '';
     return `<section class="plan-group ${date === today ? 'is-today' : ''}">
       <header class="group-head">
         <h2><span class="day-num">${dayLabel(trip, date)}</span> ${formatDate(date)}${date === today ? ' <span class="badge badge-ongoing">今天</span>' : ''}</h2>
         ${editable(`<button class="icon-btn sm" data-action="add" data-coll="plans" data-date="${date}" aria-label="在 ${formatDate(date)} 新增行程">${icon('plus')}</button>`)}
       </header>
-      ${items.length ? `<ul class="plan-list">${items.map(planItem).join('')}</ul>` : '<p class="muted small day-empty">尚無安排</p>'}
+      ${items.length ? `<ul class="plan-list">${items.map(dayItem).join('')}</ul>` : '<p class="muted small day-empty">尚無安排</p>'}
+      ${tonight}
     </section>`;
   });
-  const undated = sorted.filter((p) => !isDate(p.date));
-  if (undated.length) {
+  if (timeline.undated.length) {
     groups.push(`<section class="plan-group">
       <header class="group-head"><h2><span class="day-num">未定日期</span></h2></header>
-      <ul class="plan-list">${undated.map(planItem).join('')}</ul>
+      <ul class="plan-list">${timeline.undated.map(dayItem).join('')}</ul>
     </section>`);
   }
   return groups.join('');

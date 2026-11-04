@@ -506,3 +506,17 @@ fieldset.field { border: 0; padding: 0; }
 .member-body small { font-size: 13px; color: var(--muted); }
 .member-body .mono { letter-spacing: 0.03em; }
 .member-add { margin-top: 10px; }
+
+/* 行程分頁裡自動帶入的航班、住宿 */
+.plan.is-linked { background: var(--surface-2); border-color: transparent; box-shadow: none; }
+.plan-tag {
+  flex: none; align-self: center; margin-left: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-strong);
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.plan.is-linked.kind-checkin .plan-tag, .plan.is-linked.kind-checkout .plan-tag { background: var(--warm-soft); color: var(--warm); }
+.plan-stay { display: flex; align-items: flex-start; gap: 6px; margin: 8px 4px 0; font-size: 13px; color: var(--muted); }
+.plan-stay .icon { width: 16px; height: 16px; margin-top: 2px; }
+/* 航班副標（航班編號・抵達時間・航廈）只在空格處換行，避免「航／廈」被拆開 */
+.kind-flight .plan-body small, .kind-flight .tl-body small { word-break: keep-all; }
