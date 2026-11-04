@@ -1,7 +1,7 @@
 /* ───────────── 色彩與基本設定 ───────────── */
 /*
-  配色：取自黃昏天空的漸層
-  淺色＝夏日傍晚（天藍 → 杏桃 → 橘），深色＝冬夜（深藍 → 寶藍）
+  配色：背景是中性灰（淺色／深色模式），漸層卡片取自三個時段的天空，
+  依手機時間切換（見下方 data-sky）。
 */
 :root {
   color-scheme: light dark;
@@ -19,14 +19,7 @@
   --warm-soft: #fff0e5;
   --danger: #c8382e;
   --danger-soft: #fce9e7;
-  --sky: linear-gradient(180deg, #93b4e9 0%, #a7bbdf 20%, #d8c6bb 42%, #ecc39e 56%, #fcae6a 76%, #fc8852 100%);
-  --sky-soft: linear-gradient(180deg, #e6edfa 0%, #f4e6dc 55%, #fde1cc 100%);
   --sky-past: linear-gradient(180deg, #c3cde0 0%, #ddd6d0 60%, #e8d6c8 100%);
-  --hero-ink: #111a55;
-  --hero-ink-soft: rgba(17, 26, 85, 0.7);
-  --glass: rgba(255, 255, 255, 0.6);
-  --glass-strong: rgba(255, 255, 255, 0.78);
-  --grain-opacity: 0.32;
   --shadow: 0 1px 2px rgba(17, 26, 85, 0.04), 0 4px 14px rgba(17, 26, 85, 0.05);
   --radius: 16px;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
@@ -52,16 +45,44 @@
     --warm-soft: rgba(255, 171, 120, 0.14);
     --danger: #ff8a80;
     --danger-soft: rgba(255, 138, 128, 0.12);
-    --sky: linear-gradient(180deg, #090d57 0%, #091873 35%, #0c238d 62%, #0a339f 86%, #0b37a2 100%);
-    --sky-soft: linear-gradient(180deg, #1f2546 0%, #1b2d63 100%);
     --sky-past: linear-gradient(180deg, #2b2b30 0%, #36363c 100%);
-    --hero-ink: #ffffff;
-    --hero-ink-soft: rgba(255, 255, 255, 0.74);
-    --glass: rgba(255, 255, 255, 0.08);
-    --glass-strong: rgba(255, 255, 255, 0.16);
-    --grain-opacity: 0.22;
     --shadow: none;
   }
+}
+
+/*
+  依時段切換的天空漸層（淺色、深色模式都適用），由 js 在 <html> 設定 data-sky：
+  morning 早上＝Spring 6PM、dusk 接近傍晚＝Summer 7PM、night 晚上＝Winter 7PM
+*/
+:root {
+  /* 預設＝黃昏 */
+  --sky: linear-gradient(180deg, #93b4e9 0%, #a7bbdf 20%, #d8c6bb 42%, #ecc39e 56%, #fcae6a 76%, #fc8852 100%);
+  --sky-soft: linear-gradient(180deg, #e6edfa 0%, #f4e6dc 55%, #fde1cc 100%);
+  --hero-ink: #111a55;
+  --hero-ink-soft: rgba(17, 26, 85, 0.7);
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --grain-opacity: 0.32;
+}
+:root[data-sky='morning'] {
+  --sky: linear-gradient(180deg, #d7bd9f 0%, #e3be95 12%, #efbd87 22%, #fbab69 41%, #fe865b 59%, #fc6f51 78%, #fe694f 90%, #fd6f51 100%);
+  --sky-soft: linear-gradient(180deg, #f4ebdf 0%, #fbe2d0 55%, #fdd9cc 100%);
+  --hero-ink-soft: rgba(17, 26, 85, 0.74);
+}
+:root[data-sky='night'] {
+  --sky: linear-gradient(180deg, #090d57 0%, #091873 35%, #0c238d 62%, #0a339f 86%, #0b37a2 100%);
+  --sky-soft: linear-gradient(180deg, #e4e8f6 0%, #dbe3fa 100%);
+  --hero-ink: #ffffff;
+  --hero-ink-soft: rgba(255, 255, 255, 0.74);
+  --glass: rgba(255, 255, 255, 0.08);
+  --glass-strong: rgba(255, 255, 255, 0.16);
+  --grain-opacity: 0.22;
+}
+/* 深色模式下的淡色底（旅程圖示、航班卡片抬頭）跟著時段，但調暗 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-sky]), :root[data-sky='dusk'] { --sky-soft: linear-gradient(180deg, #242d4a 0%, #3b2d29 100%); }
+  :root[data-sky='morning'] { --sky-soft: linear-gradient(180deg, #3a3129 0%, #472b22 100%); }
+  :root[data-sky='night'] { --sky-soft: linear-gradient(180deg, #1f2546 0%, #1b2d63 100%); }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -528,3 +549,22 @@ fieldset.field { border: 0; padding: 0; }
 /* 航班副標（航班編號・抵達時間・航廈）只在空格處換行，避免「航／廈」被拆開 */
 .kind-flight .plan-body small, .kind-flight .tl-body small { word-break: keep-all; }
 .nowrap { white-space: nowrap; }
+
+/* 設定：漸層配色選擇 */
+.sky-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.sky-option { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; cursor: pointer; position: relative; }
+.sky-option input { position: absolute; opacity: 0; pointer-events: none; }
+.sky-swatch { width: 100%; aspect-ratio: 3 / 4; border-radius: 12px; }
+.sky-option input:checked + .sky-swatch { outline: 2.5px solid var(--accent); outline-offset: 3px; }
+.sky-option input:checked ~ span:last-child { color: var(--accent); }
+.sky-option input:focus-visible + .sky-swatch { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 三種天空，「自動」把三種並排 */
+.sky-morning, .sky-auto { --g-morning: linear-gradient(180deg, #d7bd9f, #efbd87 22%, #fbab69 41%, #fe865b 59%, #fd6f51); }
+.sky-dusk, .sky-auto { --g-dusk: linear-gradient(180deg, #93b4e9, #a7bbdf 20%, #d8c6bb 42%, #ecc39e 56%, #fcae6a 76%, #fc8852); }
+.sky-night, .sky-auto { --g-night: linear-gradient(180deg, #090d57, #091873 35%, #0c238d 62%, #0b37a2); }
+.sky-morning { background: var(--g-morning); }
+.sky-dusk { background: var(--g-dusk); }
+.sky-night { background: var(--g-night); }
+.sky-auto {
+  background: var(--g-morning) 0 0 / 34% 100% no-repeat, var(--g-dusk) 50% 0 / 34% 100% no-repeat, var(--g-night) 100% 0 / 34% 100% no-repeat;
+}

@@ -7,10 +7,19 @@ import { decodeTrip, extractShareRoute, openShareSheet } from './share.js';
 import * as store from './store.js';
 import * as sync from './sync.js';
 import { copyText, toast } from './ui.js';
-import { isDate, toDateStr } from './utils.js';
+import { isDate, SKY_PHASES, skyPhase, toDateStr } from './utils.js';
 import { renderFxPage, renderHome, renderSettings, renderShareImport, renderTrip } from './views.js';
 
 const app = document.getElementById('app');
+
+/* ───────────── 依時段切換漸層 ───────────── */
+
+function applySky() {
+  const mode = store.getData().settings.sky;
+  const phase = SKY_PHASES.includes(mode) ? mode : skyPhase();
+  if (document.documentElement.dataset.sky !== phase) document.documentElement.dataset.sky = phase;
+}
+applySky();
 const FORM_OF = { flights: 'flight', stays: 'stay', plans: 'plan', members: 'member' };
 
 /* ───────────── 路由 ───────────── */
@@ -398,6 +407,10 @@ const changeActions = {
     const trip = currentTrip();
     if (trip) store.toggleCheck(trip.id, el.dataset.id, el.checked);
   },
+  'sky-mode': (el) => {
+    store.updateSettings({ sky: el.value });
+    applySky();
+  },
   currency: (el) => {
     store.updateSettings({ currency: el.value });
     toast(`主要幣別：${el.value}`);
@@ -510,8 +523,11 @@ window.addEventListener('online', () => {
 setInterval(() => {
   if (document.visibilityState === 'visible' && isFxRoute()) fx.refresh();
 }, 60 * 1000);
+// 每分鐘檢查時段，跨過 5 點、15 點、19 點時換漸層
+setInterval(applySky, 60 * 1000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  applySky();
   if (isFxRoute()) fx.refresh();
   sync.refreshFollowed();
 });

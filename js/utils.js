@@ -211,3 +211,12 @@ export function buildTimeline(trip) {
   }
   return { days: sorted, undated };
 }
+
+/** 依時間決定漸層配色：早上 5–15 點＝morning、15–19 點＝dusk、其他＝night */
+export const SKY_PHASES = ['morning', 'dusk', 'night'];
+export function skyPhase(date = new Date()) {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 15) return 'morning';
+  if (hour >= 15 && hour < 19) return 'dusk';
+  return 'night';
+}

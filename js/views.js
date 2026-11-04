@@ -673,6 +673,27 @@ export function renderSettings(data) {
       </section>
 
       <section class="card">
+        <h2 class="card-title">漸層配色</h2>
+        <p class="muted small">自動：依手機時間，早上 5–15 點用晨光、15–19 點用黃昏、19 點後用夜晚。淺色、深色模式都適用。</p>
+        <div class="sky-options">
+          ${[
+            ['auto', '自動', ''],
+            ['morning', '晨光', 'morning'],
+            ['dusk', '黃昏', 'dusk'],
+            ['night', '夜晚', 'night'],
+          ]
+            .map(
+              ([value, label, phase]) => `<label class="sky-option">
+                <input type="radio" name="sky" value="${value}" data-change="sky-mode" ${(data.settings.sky || 'auto') === value ? 'checked' : ''}>
+                <span class="sky-swatch ${phase ? `sky-${phase}` : 'sky-auto'}"></span>
+                <span>${label}</span>
+              </label>`,
+            )
+            .join('')}
+        </div>
+      </section>
+
+      <section class="card">
         <h2 class="card-title">主要幣別</h2>
         <p class="muted small">新增航班、住宿、行程時預先帶入，也是花費換算的目標幣別。</p>
         <select data-change="currency" aria-label="預設幣別">

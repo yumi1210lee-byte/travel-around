@@ -95,3 +95,15 @@ test('旅程圖示：新圖示、舊版 emoji 對應、預設飛機', async () =
   assert.equal(tripIconId({}), 'plane');
   assert.equal(tripEmoji({ icon: 'snow' }), '❄️');
 });
+
+test('依時間決定漸層：早上、接近傍晚、晚上', async () => {
+  const { skyPhase } = await import('../js/utils.js');
+  const at = (h, m = 0) => new Date(2026, 10, 4, h, m);
+  assert.equal(skyPhase(at(4, 59)), 'night');
+  assert.equal(skyPhase(at(5)), 'morning');
+  assert.equal(skyPhase(at(14, 59)), 'morning');
+  assert.equal(skyPhase(at(15)), 'dusk');
+  assert.equal(skyPhase(at(18, 59)), 'dusk');
+  assert.equal(skyPhase(at(19)), 'night');
+  assert.equal(skyPhase(at(0)), 'night');
+});
