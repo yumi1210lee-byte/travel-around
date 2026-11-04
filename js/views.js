@@ -235,17 +235,18 @@ function entryInfo(entry) {
   let emoji;
   let title;
   let sub;
+  let endTime = '';
+  let endShift = 0;
   switch (entry.kind) {
     case 'flight': {
+      // 落地時間顯示在時間欄（起飛下面），跨日會標 +1
       const [depDate] = splitDateTime(r.departAt);
       const [arrDate, arrTime] = splitDateTime(r.arriveAt);
+      endTime = arrTime;
+      endShift = depDate && arrDate ? diffDays(depDate, arrDate) : 0;
       emoji = '🛫';
       title = routeText(r);
-      sub = [
-        [normalizeFlightNo(r.flightNo), r.airline].filter(Boolean).join(' '),
-        arrTime && (!arrDate || arrDate === depDate) ? `${arrTime} 抵達` : '',
-        r.terminal ? `航廈 ${r.terminal}` : '',
-      ]
+      sub = [[normalizeFlightNo(r.flightNo), r.airline].filter(Boolean).join(' '), r.terminal ? `航廈 ${r.terminal}` : '']
         .filter(Boolean)
         .join('・');
       break;
@@ -269,14 +270,24 @@ function entryInfo(entry) {
       title = r.title;
       sub = r.location;
   }
-  return { emoji, title, sub };
+  return { emoji, title, sub, endTime, endShift };
+}
+
+/** 時間欄：一般只有一個時間；航班是「起飛／落地」上下兩行 */
+function timeCell(cls, start, end, shift) {
+  if (!end) return `<span class="${cls}">${h(start || '')}</span>`;
+  const label = `起飛 ${start || '未定'}，落地 ${end}${shift ? `（${shift > 0 ? '+' : ''}${shift} 天）` : ''}`;
+  return `<span class="${cls} has-end" aria-label="${h(label)}">
+    <span class="time-start">${h(start || '--:--')}</span>
+    <span class="time-end">${h(end)}${shift ? `<sup>${shift > 0 ? '+' : ''}${shift}</sup>` : ''}</span>
+  </span>`;
 }
 
 function timelineEntry(entry) {
   const r = entry.ref;
-  const { emoji, title, sub } = entryInfo(entry);
+  const { emoji, title, sub, endTime, endShift } = entryInfo(entry);
   return `<li><button class="tl-item kind-${entry.kind}" ${editAttrs(entry.coll, r.id)}>
-    <span class="tl-time">${h(entry.time || '')}</span>
+    ${timeCell('tl-time', entry.time, endTime, endShift)}
     <span class="tl-icon" aria-hidden="true">${emoji}</span>
     <span class="tl-body"><b>${h(title)}</b>${sub ? `<small>${h(sub)}</small>` : ''}</span>
   </button></li>`;
@@ -558,7 +569,7 @@ function planItem(p) {
 /** 行程分頁裡自動帶入的航班、住宿（點了一樣可以編輯） */
 function linkedItem(entry) {
   const r = entry.ref;
-  const { emoji, title, sub } = entryInfo(entry);
+  const { emoji, title, sub, endTime, endShift } = entryInfo(entry);
   const tag = entry.coll === 'flights' ? '航班' : '住宿';
   const map =
     entry.kind === 'checkin' && r.address
@@ -566,7 +577,7 @@ function linkedItem(entry) {
       : '';
   return `<li class="plan is-linked kind-${entry.kind}">
     <button class="plan-main" ${editAttrs(entry.coll, r.id)}>
-      <span class="plan-time">${h(entry.time || '')}</span>
+      ${timeCell('plan-time', entry.time, endTime, endShift)}
       <span class="plan-cat" aria-hidden="true">${emoji}</span>
       <span class="plan-body"><b>${h(title)}</b>${sub ? `<small>${h(sub)}</small>` : ''}</span>
       <span class="plan-tag">${tag}</span>

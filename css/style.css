@@ -568,3 +568,13 @@ fieldset.field { border: 0; padding: 0; }
 .sky-auto {
   background: var(--g-morning) 0 0 / 34% 100% no-repeat, var(--g-dusk) 50% 0 / 34% 100% no-repeat, var(--g-night) 100% 0 / 34% 100% no-repeat;
 }
+
+/* 航班的時間欄：起飛在上、落地在下，中間用細線連起來 */
+.has-end { display: flex; flex-direction: column; width: 48px; }
+.has-end .time-start { color: var(--text); font-weight: 600; }
+.has-end .time-end { position: relative; margin-top: 14px; white-space: nowrap; }
+.has-end .time-end::before {
+  content: ''; position: absolute; left: 1.1em; top: -12px; height: 10px;
+  border-left: 1.5px dotted var(--muted); opacity: 0.7;
+}
+.has-end sup { font-size: 9px; font-weight: 700; color: var(--warm); margin-left: 1px; }
