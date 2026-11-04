@@ -47,6 +47,10 @@ export function createSampleTrip(today) {
       { date: d(3), time: '13:00', title: '六義園賞楓', category: 'sight', location: '六義園', price: 300, currency: 'JPY' },
       { date: d(4), time: '09:00', title: '新宿最後採買', category: 'shopping', location: '新宿' },
     ],
+    members: [
+      { name: '小美', englishName: 'WANG XIAO-MEI', phone: '+886 912 345 678', notes: '不吃牛肉' },
+      { name: '阿哲', englishName: 'CHEN A-ZHE', phone: '+886 987 654 321' },
+    ],
     checklist: [
       { text: '護照（效期 6 個月以上）', done: true },
       { text: '電子機票 / 訂位代號', done: true },

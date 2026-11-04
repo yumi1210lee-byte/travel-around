@@ -64,6 +64,7 @@ function tripCard(trip, today) {
     trip.flights.length && `${trip.flights.length} 航班`,
     trip.stays.length && `${trip.stays.length} 住宿`,
     trip.plans.length && `${trip.plans.length} 行程`,
+    trip.members?.length && `${trip.members.length} 人`,
   ]
     .filter(Boolean)
     .join('・');
@@ -316,6 +317,46 @@ function costsCard(trip, { fx, homeCurrency }) {
   return `<section class="card costs"><h2 class="card-title">已記錄花費</h2><ul>${rows}${total}</ul>${hint}</section>`;
 }
 
+// 頭像底色：用名字算出固定的顏色（取自天空漸層）
+const AVATAR_COLORS = ['#93b4e9', '#fcae6a', '#d8c6bb', '#fc8852', '#a7bbdf', '#ecc39e', '#bec1d1'];
+function avatarColor(name) {
+  let hash = 0;
+  for (const ch of String(name)) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+function memberRow(m) {
+  const initial = Array.from(String(m.name || '?').trim())[0] || '?';
+  const tel = String(m.phone || '').replace(/[^\d+]/g, '');
+  return `<li class="member">
+    <button class="member-main" ${editAttrs('members', m.id)}>
+      <span class="avatar" style="--av:${avatarColor(m.name)}" aria-hidden="true">${h(initial.toUpperCase())}</span>
+      <span class="member-body">
+        <b>${h(m.name)}</b>
+        ${m.englishName ? `<small class="mono">${h(m.englishName)}</small>` : ''}
+        ${m.notes ? `<small class="clamp">${h(m.notes)}</small>` : ''}
+      </span>
+    </button>
+    ${m.englishName ? `<button class="icon-btn sm" data-action="copy" data-text="${h(m.englishName)}" aria-label="複製 ${h(m.name)} 的護照英文姓名">${icon('copy')}</button>` : ''}
+    ${tel ? `<a class="icon-btn sm" href="tel:${h(tel)}" aria-label="打電話給 ${h(m.name)}">${icon('phone')}</a>` : ''}
+  </li>`;
+}
+
+function membersCard(trip) {
+  const list = trip.members || [];
+  if (!list.length && READ_ONLY) return '';
+  return `<section class="card members">
+    <header class="card-title-row">
+      <h2 class="card-title">👥 同行成員</h2>
+      ${list.length ? `<span class="muted small">${list.length} 人</span>` : ''}
+    </header>
+    ${list.length
+      ? `<ul class="member-list">${list.map(memberRow).join('')}</ul>`
+      : '<p class="muted small">把一起出發的人加進來，記下護照英文姓名和聯絡電話，訂票或緊急時都找得到。</p>'}
+    ${editable(`<button class="btn block member-add" data-action="add" data-coll="members">${icon('plus')}新增成員</button>`)}
+  </section>`;
+}
+
 function overview(trip, ctx) {
   const today = toDateStr();
   const now = nowLocal();
@@ -354,6 +395,7 @@ function overview(trip, ctx) {
   </div>`;
 
   const costs = costsCard(trip, ctx);
+  const members = membersCard(trip);
 
   const todayDay = status.state === 'ongoing' ? timeline.days.find((d) => d.date === today) : null;
   const days = timeline.days.length
@@ -369,6 +411,7 @@ function overview(trip, ctx) {
     ${todayDay ? `<h2 class="section-title spaced">今天的安排</h2>${daySection(trip, todayDay, '')}` : ''}
     ${cards.length ? `<div class="stack spaced">${cards.join('')}</div>` : ''}
     ${stats}
+    ${members}
     ${costs}
     ${trip.notes ? `<section class="card"><h2 class="card-title">備註</h2>${notesBlock(trip.notes)}</section>` : ''}
     <h2 class="section-title spaced">每日行程</h2>

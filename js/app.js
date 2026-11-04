@@ -11,7 +11,7 @@ import { isDate, toDateStr } from './utils.js';
 import { renderFxPage, renderHome, renderSettings, renderShareImport, renderTrip } from './views.js';
 
 const app = document.getElementById('app');
-const FORM_OF = { flights: 'flight', stays: 'stay', plans: 'plan' };
+const FORM_OF = { flights: 'flight', stays: 'stay', plans: 'plan', members: 'member' };
 
 /* ───────────── 路由 ───────────── */
 

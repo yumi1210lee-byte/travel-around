@@ -22,7 +22,7 @@ import {
 export const DEFAULT_SHARE_OPTIONS = { hideSensitive: true, hidePrices: false, includeChecklist: false };
 
 // 可能被拿去改票、取消訂房的資料
-const SENSITIVE = { flights: ['bookingRef'], stays: ['confirmation', 'url'], plans: [] };
+const SENSITIVE = { flights: ['bookingRef'], stays: ['confirmation', 'url'], plans: [], members: ['englishName', 'phone'] };
 const PRICE_FIELDS = ['price', 'currency'];
 const MAX_ITEMS = 500;
 const CATEGORY = Object.fromEntries(PLAN_CATEGORIES.map((c) => [c.value, c]));
@@ -35,6 +35,7 @@ const SCHEMA = {
   flights: fieldsOf('flight'),
   stays: fieldsOf('stay'),
   plans: fieldsOf('plan'),
+  members: fieldsOf('member'),
   checklist: [{ name: 'text' }],
 };
 
@@ -65,7 +66,7 @@ export function buildSharedTrip(trip, opts = DEFAULT_SHARE_OPTIONS) {
     ...(opts.hidePrices ? PRICE_FIELDS : []),
   ];
   const out = { id: String(trip.id || ''), ...pick(trip, SCHEMA.trip) };
-  for (const coll of ['flights', 'stays', 'plans']) {
+  for (const coll of ['flights', 'stays', 'plans', 'members']) {
     out[coll] = list(trip[coll]).map((item) => pick(item, SCHEMA[coll], skipFor(coll)));
   }
   out.checklist = opts.includeChecklist ? list(trip.checklist).map((c) => pick(c, SCHEMA.checklist)) : [];
@@ -82,6 +83,7 @@ export function sanitizeSharedTrip(raw) {
     .filter((p) => p.title)
     .map((p) => ({ ...p, category: Object.hasOwn(CATEGORY, p.category) ? p.category : 'other' }));
   trip.stays = trip.stays.filter((s) => s.name);
+  trip.members = trip.members.filter((m) => m.name);
   if (!/^[\w-]{1,64}$/.test(trip.id)) delete trip.id;
   return trip;
 }
@@ -158,7 +160,13 @@ export function shareText(trip, opts = DEFAULT_SHARE_OPTIONS) {
   const t = buildSharedTrip(trip, opts);
   const blocks = [];
   blocks.push(
-    [`${t.emoji || '✈️'} ${t.name}`, [t.destination, formatRange(t.startDate, t.endDate)].filter(Boolean).join('｜')].join('\n'),
+    [
+      `${t.emoji || '✈️'} ${t.name}`,
+      [t.destination, formatRange(t.startDate, t.endDate)].filter(Boolean).join('｜'),
+      t.members.length ? `👥 ${t.members.map((m) => m.name).join('、')}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
   );
 
   if (t.flights.length) {
@@ -308,7 +316,7 @@ export function openShareSheet(initialTrip, { toast, copyText, sync, getTrip, su
         <p class="field-label">分享的內容</p>
         <div class="share-options">
           <label class="check-row"><input type="checkbox" name="hideSensitive" ${opts.hideSensitive ? 'checked' : ''}>
-            <span><b>隱藏訂位代號、訂房編號與訂房連結</b><small>有訂位代號和姓氏，就可能被拿去改票或取消</small></span></label>
+            <span><b>隱藏訂位代號、訂房編號、訂房連結與成員個資</b><small>有訂位代號和姓氏就可能被改票或取消；成員只顯示名字</small></span></label>
           <label class="check-row"><input type="checkbox" name="hidePrices" ${opts.hidePrices ? 'checked' : ''}>
             <span><b>隱藏金額</b><small>票價、房價與行程花費</small></span></label>
           <label class="check-row"><input type="checkbox" name="includeChecklist" ${opts.includeChecklist ? 'checked' : ''}>

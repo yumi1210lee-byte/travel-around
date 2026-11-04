@@ -95,3 +95,15 @@ test('貼上的文字可以辨識一次性連結與同步連結', () => {
   assert.equal(extractShareRoute('https://x.io/#/s/short'), '');
   assert.equal(extractShareRoute('hello'), '');
 });
+
+test('成員：預設只分享名字與備註，電話與護照英文姓名會隱藏', () => {
+  const shared = buildSharedTrip(trip);
+  assert.deepEqual(shared.members.map((m) => m.name), ['小美', '阿哲']);
+  assert.equal(shared.members[0].phone, undefined);
+  assert.equal(shared.members[0].englishName, undefined);
+  assert.equal(shared.members[0].notes, '不吃牛肉');
+  const full = buildSharedTrip(trip, { hideSensitive: false, hidePrices: false, includeChecklist: false });
+  assert.equal(full.members[0].englishName, 'WANG XIAO-MEI');
+  assert.match(shareText(trip), /👥 小美、阿哲/);
+  assert.deepEqual(sanitizeSharedTrip({ name: 'x', members: [{ name: '' }, { name: 'A', evil: 1 }] }).members, [{ name: 'A' }]);
+});

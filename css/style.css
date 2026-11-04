@@ -37,12 +37,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #04071f;
-    --surface: #0a0f3d;
-    --surface-2: #11184d;
-    --text: #e9ecff;
-    --muted: #98a0d2;
-    --border: #1b2360;
+    /* 背景用中性灰，冬夜漸層只用在卡片上 */
+    --bg: #121212;
+    --surface: #1c1c1e;
+    --surface-2: #2a2a2d;
+    --text: #ececee;
+    --muted: #9e9ea5;
+    --border: #2f2f33;
     --accent: #93b4e9;
     --accent-strong: #bcd0f4;
     --accent-soft: rgba(147, 180, 233, 0.14);
@@ -52,8 +53,8 @@
     --danger: #ff8a80;
     --danger-soft: rgba(255, 138, 128, 0.12);
     --sky: linear-gradient(180deg, #090d57 0%, #091873 35%, #0c238d 62%, #0a339f 86%, #0b37a2 100%);
-    --sky-soft: linear-gradient(180deg, #0d1462 0%, #0d248a 100%);
-    --sky-past: linear-gradient(180deg, #121640 0%, #1c2462 100%);
+    --sky-soft: linear-gradient(180deg, #1f2546 0%, #1b2d63 100%);
+    --sky-past: linear-gradient(180deg, #2b2b30 0%, #36363c 100%);
     --hero-ink: #ffffff;
     --hero-ink-soft: rgba(255, 255, 255, 0.74);
     --glass: rgba(255, 255, 255, 0.08);
@@ -486,3 +487,22 @@ fieldset.field { border: 0; padding: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ───────────── 同行成員 ───────────── */
+.card-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.member-list { list-style: none; margin: 4px -6px 0; padding: 0; }
+.member { display: flex; align-items: center; gap: 2px; border-top: 1px solid var(--border); }
+.member:first-child { border-top: 0; }
+.member-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 6px; border-radius: 12px; text-align: left; }
+.member-main[data-action]:hover { background: var(--surface-2); }
+.avatar {
+  display: grid; place-items: center; flex: none;
+  width: 40px; height: 40px; border-radius: 999px;
+  background: var(--av, var(--accent-soft)); color: #111a55;
+  font-weight: 800; font-size: 16px;
+}
+.member-body { min-width: 0; display: flex; flex-direction: column; }
+.member-body b { font-weight: 600; }
+.member-body small { font-size: 13px; color: var(--muted); }
+.member-body .mono { letter-spacing: 0.03em; }
+.member-add { margin-top: 10px; }

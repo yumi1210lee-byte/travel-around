@@ -100,6 +100,22 @@ export const FORMS = {
     validate: (v) => (v.checkOut && v.checkIn && v.checkOut < v.checkIn ? '退房日不能早於入住日' : ''),
   },
 
+  member: {
+    title: '成員',
+    fields: [
+      { name: 'name', label: '名字／暱稱', required: true, placeholder: '例：小美' },
+      {
+        name: 'englishName',
+        label: '護照英文姓名',
+        placeholder: 'WANG XIAO-MEI',
+        transform: upper,
+        attrs: 'autocapitalize="characters" autocomplete="off" spellcheck="false"',
+      },
+      { name: 'phone', label: '電話', type: 'tel', placeholder: '+886 912 345 678' },
+      notes('過敏、飲食禁忌、緊急聯絡人…'),
+    ],
+  },
+
   plan: {
     title: '行程',
     fields: [

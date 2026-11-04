@@ -2,7 +2,7 @@
 import { uid } from './utils.js';
 
 const STORAGE_KEY = 'travel-around/v1';
-const COLLECTIONS = ['flights', 'stays', 'plans', 'checklist'];
+const COLLECTIONS = ['flights', 'stays', 'plans', 'checklist', 'members'];
 
 const emptyData = () => ({ version: 1, trips: [], settings: { currency: 'TWD', lastBackup: '' } });
 
