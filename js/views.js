@@ -75,7 +75,10 @@ function tripCard(trip, today) {
       <p class="muted small">${h(formatRange(trip.startDate, trip.endDate))}</p>
       ${meta ? `<p class="muted small">${meta}</p>` : ''}
     </div>
-    <span class="badge badge-${status.state}">${h(statusLabel(status))}</span>
+    <span class="trip-badges">
+      <span class="badge badge-${status.state}">${h(statusLabel(status))}</span>
+      ${trip.follow ? '<span class="badge">🔄 同步中</span>' : trip.share ? '<span class="badge">🔗 已分享</span>' : ''}
+    </span>
   </a>`;
 }
 
@@ -131,6 +134,34 @@ const TABS = [
   { id: 'fx', label: '換匯', icon: 'exchange' },
 ];
 
+// 別人用同步連結分享給你的旅程是唯讀的：渲染時不放編輯、新增按鈕
+let READ_ONLY = false;
+const editable = (html) => (READ_ONLY ? '' : html);
+const editAttrs = (coll, id) => (READ_ONLY ? '' : `data-action="edit" data-coll="${coll}" data-id="${h(id)}"`);
+
+const syncTime = (iso) =>
+  iso ? new Date(iso).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+
+function followBanner(trip, full) {
+  const f = trip.follow;
+  const status =
+    {
+      gone: '分享的人已經停止分享，這是最後一次同步的版本',
+      offline: `目前沒有網路，顯示的是 ${syncTime(f.remoteUpdatedAt)} 的版本`,
+      error: `暫時無法檢查更新，顯示的是 ${syncTime(f.remoteUpdatedAt)} 的版本`,
+    }[f.status] || `對方修改後會自動更新・最後更新 ${syncTime(f.remoteUpdatedAt)}`;
+  if (!full) return `<p class="follow-slim">🔄 同步中的旅程（唯讀）・${h(status)}</p>`;
+  return `<section class="card follow-banner ${f.status === 'gone' ? 'is-gone' : ''}">
+    <p><b>🔄 別人分享給你的旅程</b></p>
+    <p class="muted small">${h(status)}。這趟旅程是唯讀的，行李清單可以自己勾選。</p>
+    <div class="row-btns">
+      ${f.status === 'gone' ? '' : '<button class="btn" data-action="follow-refresh">檢查更新</button>'}
+      <button class="btn" data-action="follow-detach">改成我可以編輯</button>
+      <button class="btn danger" data-action="delete-followed">刪除</button>
+    </div>
+  </section>`;
+}
+
 const FAB = {
   flights: ['flights', '新增航班'],
   stays: ['stays', '新增住宿'],
@@ -139,9 +170,12 @@ const FAB = {
 
 export function renderTrip(trip, tab, ctx) {
   if (!TABS.some((t) => t.id === tab)) tab = 'overview';
+  READ_ONLY = Boolean(trip.follow);
   const fx = () => renderConverter(ctx.fx, ctx.fxInput);
   const content = { overview, flights, stays, plans, checklist, fx }[tab](trip, ctx);
-  const fab = FAB[tab];
+  const fab = READ_ONLY ? null : FAB[tab];
+  const banner = READ_ONLY && tab !== 'fx' ? followBanner(trip, tab === 'overview') : '';
+  READ_ONLY = false;
   const subtitle = [trip.destination, formatRange(trip.startDate, trip.endDate)].filter(Boolean).join('・');
 
   return `
@@ -152,9 +186,9 @@ export function renderTrip(trip, tab, ctx) {
         <p>${h(subtitle)}</p>
       </div>
       <button class="icon-btn" data-action="share-trip" aria-label="分享旅程">${icon('share')}</button>
-      <button class="icon-btn" data-action="edit-trip" aria-label="編輯旅程">${icon('edit')}</button>
+      ${trip.follow ? '' : `<button class="icon-btn" data-action="edit-trip" aria-label="編輯旅程">${icon('edit')}</button>`}
     </header>
-    <main class="page has-tabbar">${content}</main>
+    <main class="page has-tabbar">${banner}${content}</main>
     ${fab ? `<button class="fab" data-action="add" data-coll="${fab[0]}">${icon('plus')}<span>${fab[1]}</span></button>` : ''}
     <nav class="tabbar" aria-label="旅程分頁">
       ${TABS.map(
@@ -190,7 +224,7 @@ function hero(trip, status) {
     default:
       return `<section class="hero is-past">
         <div><p class="hero-label">還沒設定日期</p><p class="hero-sub">設定出發日就能開始倒數</p></div>
-        <button class="btn on-hero" data-action="edit-trip">設定日期</button>
+        ${editable('<button class="btn on-hero" data-action="edit-trip">設定日期</button>')}
       </section>`;
   }
 }
@@ -225,7 +259,7 @@ function timelineEntry(entry) {
       title = r.title;
       sub = r.location;
   }
-  return `<li><button class="tl-item kind-${entry.kind}" data-action="edit" data-coll="${entry.coll}" data-id="${h(r.id)}">
+  return `<li><button class="tl-item kind-${entry.kind}" ${editAttrs(entry.coll, r.id)}>
     <span class="tl-time">${h(entry.time || '')}</span>
     <span class="tl-icon" aria-hidden="true">${emoji}</span>
     <span class="tl-body"><b>${h(title)}</b>${sub ? `<small>${h(sub)}</small>` : ''}</span>
@@ -382,7 +416,7 @@ function flightCard(f) {
     <footer class="card-actions">
       ${no ? `<a class="chip" href="${flightStatusUrl(no)}" ${ext}>${icon('external')}航班動態</a>
       <a class="chip" href="${flightradarUrl(no)}" ${ext}>Flightradar24</a>` : ''}
-      <button class="chip" data-action="edit" data-coll="flights" data-id="${h(f.id)}">${icon('edit')}編輯</button>
+      ${editable(`<button class="chip" data-action="edit" data-coll="flights" data-id="${h(f.id)}">${icon('edit')}編輯</button>`)}
     </footer>
   </article>`;
 }
@@ -393,7 +427,7 @@ function flights(trip) {
       '✈️',
       '還沒有航班',
       '記下航班編號、起降時間、航廈、座位和訂位代號，出發當天一目了然。',
-      `<button class="btn primary" data-action="add" data-coll="flights">${icon('plus')}新增航班</button>`,
+      editable(`<button class="btn primary" data-action="add" data-coll="flights">${icon('plus')}新增航班</button>`),
     );
   }
   return `<div class="stack">${sortFlights(trip.flights).map(flightCard).join('')}</div>`;
@@ -426,7 +460,7 @@ function stayCard(s, today) {
       ${mapQuery ? `<a class="chip" href="${mapsUrl(mapQuery)}" ${ext}>${icon('pin')}地圖</a>` : ''}
       ${tel ? `<a class="chip" href="tel:${h(tel)}">${icon('phone')}撥打</a>` : ''}
       ${url ? `<a class="chip" href="${h(url)}" ${ext}>${icon('external')}訂房頁面</a>` : ''}
-      <button class="chip" data-action="edit" data-coll="stays" data-id="${h(s.id)}">${icon('edit')}編輯</button>
+      ${editable(`<button class="chip" data-action="edit" data-coll="stays" data-id="${h(s.id)}">${icon('edit')}編輯</button>`)}
     </footer>
   </article>`;
 }
@@ -437,7 +471,7 @@ function stays(trip) {
       '🏨',
       '還沒有住宿',
       '存下地址、入住退房時間和訂房編號，一鍵開地圖導航。',
-      `<button class="btn primary" data-action="add" data-coll="stays">${icon('plus')}新增住宿</button>`,
+      editable(`<button class="btn primary" data-action="add" data-coll="stays">${icon('plus')}新增住宿</button>`),
     );
   }
   const today = toDateStr();
@@ -449,7 +483,7 @@ function stays(trip) {
 function planItem(p) {
   const cat = Object.hasOwn(CATEGORY, p.category) ? CATEGORY[p.category] : CATEGORY.other;
   return `<li class="plan">
-    <button class="plan-main" data-action="edit" data-coll="plans" data-id="${h(p.id)}">
+    <button class="plan-main" ${editAttrs('plans', p.id)}>
       <span class="plan-time">${h(p.time || '')}</span>
       <span class="plan-cat" aria-hidden="true">${cat.emoji}</span>
       <span class="plan-body">
@@ -472,7 +506,7 @@ function plans(trip) {
       '🗺️',
       '還沒有行程',
       '新增想去的景點、餐廳和交通安排，會自動依日期與時間排序。',
-      `<button class="btn primary" data-action="add" data-coll="plans">${icon('plus')}新增行程</button>`,
+      editable(`<button class="btn primary" data-action="add" data-coll="plans">${icon('plus')}新增行程</button>`),
     );
   }
   const today = toDateStr();
@@ -481,7 +515,7 @@ function plans(trip) {
     return `<section class="plan-group ${date === today ? 'is-today' : ''}">
       <header class="group-head">
         <h2><span class="day-num">${dayLabel(trip, date)}</span> ${formatDate(date)}${date === today ? ' <span class="badge badge-ongoing">今天</span>' : ''}</h2>
-        <button class="icon-btn sm" data-action="add" data-coll="plans" data-date="${date}" aria-label="在 ${formatDate(date)} 新增行程">${icon('plus')}</button>
+        ${editable(`<button class="icon-btn sm" data-action="add" data-coll="plans" data-date="${date}" aria-label="在 ${formatDate(date)} 新增行程">${icon('plus')}</button>`)}
       </header>
       ${items.length ? `<ul class="plan-list">${items.map(planItem).join('')}</ul>` : '<p class="muted small day-empty">尚無安排</p>'}
     </section>`;
@@ -598,11 +632,18 @@ export function renderShareImport(state, existing, env) {
   let body;
   if (state.status === 'ready') body = renderSharePreview(state.trip, existing, env);
   else if (state.status === 'error') {
+    const text = {
+      offline: '目前無法連線。請確認網路後，重新打開這個連結。',
+      'not-found': '這份分享已經停止，或連結不完整。可以請對方重新分享一次。',
+    }[state.error] || '連結可能不完整。請確認整段連結都有複製到，或請對方重新分享一次。';
     body = emptyState(
       '🔗',
       '無法讀取這個分享連結',
-      '連結可能不完整。請確認整段連結都有複製到，或請對方重新分享一次。',
-      '<a class="btn primary" href="#/">回到旅程列表</a>',
+      text,
+      `<div class="row-btns center">
+        ${state.error === 'offline' ? '<button class="btn primary" data-action="retry-incoming">重試</button>' : ''}
+        <a class="btn ${state.error === 'offline' ? '' : 'primary'}" href="#/">回到旅程列表</a>
+      </div>`,
     );
   } else body = '<p class="muted center" style="padding:48px 0">讀取中…</p>';
   return `

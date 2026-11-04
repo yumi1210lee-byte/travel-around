@@ -89,8 +89,18 @@ function commit() {
   return ok;
 }
 
-export const subscribe = (fn) => listeners.add(fn);
+export const subscribe = (fn) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
 export const onSaveError = (fn) => errorListeners.add(fn);
+
+/** 新的修改時間：一定比上一次晚（同步用它判斷有沒有新修改） */
+function nextStamp(prev) {
+  const now = Date.now();
+  const last = Date.parse(prev || '') || 0;
+  return new Date(Math.max(now, last + 1)).toISOString();
+}
 
 export const getData = () => data;
 export const getTrip = (id) => data.trips.find((t) => t.id === id) || null;
@@ -100,7 +110,7 @@ export function saveTrip(fields) {
   const index = data.trips.findIndex((t) => t.id === fields.id);
   let trip;
   if (index >= 0) {
-    trip = normalizeTrip({ ...data.trips[index], ...fields, updatedAt: now });
+    trip = normalizeTrip({ ...data.trips[index], ...fields, updatedAt: nextStamp(data.trips[index].updatedAt) });
     data.trips[index] = trip;
   } else {
     trip = normalizeTrip({ ...fields, id: uid(), createdAt: now, updatedAt: now });
@@ -124,7 +134,7 @@ export function saveItem(tripId, coll, item) {
   if (index >= 0) list[index] = saved;
   else list.push(saved);
   if (saved.currency) trip.lastCurrency = saved.currency;
-  trip.updatedAt = new Date().toISOString();
+  trip.updatedAt = nextStamp(trip.updatedAt);
   commit();
   return saved;
 }
@@ -133,7 +143,7 @@ export function saveItems(tripId, coll, items) {
   const trip = getTrip(tripId);
   if (!trip || !COLLECTIONS.includes(coll)) return;
   trip[coll].push(...items.map((x) => ({ ...x, id: x.id || uid() })));
-  trip.updatedAt = new Date().toISOString();
+  trip.updatedAt = nextStamp(trip.updatedAt);
   commit();
 }
 
@@ -141,7 +151,7 @@ export function deleteItem(tripId, coll, itemId) {
   const trip = getTrip(tripId);
   if (!trip || !COLLECTIONS.includes(coll)) return;
   trip[coll] = trip[coll].filter((x) => x.id !== itemId);
-  trip.updatedAt = new Date().toISOString();
+  trip.updatedAt = nextStamp(trip.updatedAt);
   commit();
 }
 
@@ -149,7 +159,7 @@ export function setChecklist(tripId, list) {
   const trip = getTrip(tripId);
   if (!trip) return;
   trip.checklist = list;
-  trip.updatedAt = new Date().toISOString();
+  trip.updatedAt = nextStamp(trip.updatedAt);
   commit();
 }
 
@@ -195,7 +205,7 @@ export function importData(text) {
  * 加入別人分享的旅程。asCopy 時用新的 id（另存一份），
  * 否則沿用分享者的 id，之後收到更新的連結可以直接取代。
  */
-export function importTrip(trip, { asCopy = false } = {}) {
+export function importTrip(trip, { asCopy = false, follow = null } = {}) {
   const now = new Date().toISOString();
   const incoming = normalizeTrip({
     ...trip,
@@ -203,12 +213,52 @@ export function importTrip(trip, { asCopy = false } = {}) {
     importedAt: now,
     createdAt: now,
     updatedAt: now,
+    ...(follow ? { follow } : {}),
   });
   const index = data.trips.findIndex((t) => t.id === incoming.id);
   if (index >= 0) data.trips[index] = incoming;
   else data.trips.push(incoming);
   commit();
   return incoming;
+}
+
+/* ── 雲端同步用的中繼資料（不算「修改旅程」，不會更新 updatedAt） ── */
+
+/** 分享者：記錄雲端分享的代碼、選項與同步狀態；傳 null 代表停止分享 */
+export function setShareMeta(tripId, share) {
+  const trip = getTrip(tripId);
+  if (!trip) return;
+  if (share) trip.share = share;
+  else delete trip.share;
+  commit();
+}
+
+/** 收到分享的人：記錄追蹤的分享代碼與最後同步狀態；傳 null 代表停止同步 */
+export function setFollowMeta(tripId, follow) {
+  const trip = getTrip(tripId);
+  if (!trip) return;
+  if (follow) trip.follow = follow;
+  else delete trip.follow;
+  commit();
+}
+
+/** 用雲端的新版本取代旅程內容；行李清單是自己的，保留本機版本 */
+export function applyRemoteTrip(tripId, remote, follow) {
+  const index = data.trips.findIndex((t) => t.id === tripId);
+  if (index < 0) return null;
+  const local = data.trips[index];
+  const trip = normalizeTrip({
+    ...remote,
+    id: local.id,
+    checklist: local.checklist.length ? local.checklist : remote.checklist || [],
+    importedAt: local.importedAt,
+    createdAt: local.createdAt,
+    updatedAt: new Date().toISOString(),
+    follow,
+  });
+  data.trips[index] = trip;
+  commit();
+  return trip;
 }
 
 export function clearAll() {

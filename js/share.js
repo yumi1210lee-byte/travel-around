@@ -141,6 +141,14 @@ export function extractPayload(text) {
   return match ? match[1] : '';
 }
 
+/** 從貼上的文字找出要前往的分享頁（一次性連結 #/share/… 或同步連結 #/s/…） */
+export function extractShareRoute(text) {
+  const payload = extractPayload(text);
+  if (payload) return `#/share/${payload}`;
+  const match = String(text || '').match(/#\/s\/([\w-]{16,64})/);
+  return match ? `#/s/${match[1]}` : '';
+}
+
 /* ───────────── 文字版 ───────────── */
 
 const oneLine = (text) => String(text).replace(/\s*\n\s*/g, ' / ');
@@ -240,19 +248,54 @@ async function systemShare(data, fallback) {
   }
 }
 
-/** 開啟分享視窗。ui = { toast, copyText } */
-export function openShareSheet(trip, { toast, copyText }) {
+const timeLabel = (iso) =>
+  iso ? new Date(iso).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+
+/**
+ * 開啟分享視窗。
+ * deps = { toast, copyText, sync, getTrip, subscribe }
+ *   sync：雲端同步功能（enabled、start、stop、updateOptions、cloudLink）
+ */
+export function openShareSheet(initialTrip, { toast, copyText, sync, getTrip, subscribe }) {
   const dialog = document.getElementById('sheet');
   const base = `${location.origin}${location.pathname}`;
-  const opts = { ...DEFAULT_SHARE_OPTIONS };
+  let trip = initialTrip;
+  const opts = { ...DEFAULT_SHARE_OPTIONS, ...(trip.share?.opts || {}) };
+  // 別人分享給你的旅程不能再建立同步連結（你不是擁有者）
+  const cloudAllowed = Boolean(sync?.enabled) && !trip.follow;
   let link = '';
   let text = '';
   let version = 0;
+  let busy = false;
+  let cloudError = '';
 
   const shareBtn = (kind, label) =>
     canShare() ? `<button type="button" class="btn primary" data-share="${kind}">${label}</button>` : '';
   const copyBtn = (kind, label) =>
     `<button type="button" class="btn ${canShare() ? '' : 'primary'}" data-share="${kind}">${label}</button>`;
+
+  function cloudBlock() {
+    const share = trip.share;
+    if (!share) {
+      return `<h3>🔄 同步連結 <span class="badge badge-upcoming">推薦</span></h3>
+        <p class="muted small">對方加入後，你之後改的內容都會自動同步給他。對方只能看、不能改。</p>
+        ${cloudError ? `<p class="small share-error">⚠️ ${h(cloudError)}</p>` : ''}
+        <div class="row-btns"><button type="button" class="btn primary" data-share="cloud-start" ${busy ? 'disabled' : ''}>${busy ? '建立中…' : '建立同步連結'}</button></div>`;
+    }
+    const pending = share.syncedAt !== trip.updatedAt;
+    const status =
+      {
+        offline: '⏳ 目前沒有網路，連上後會自動同步',
+        forbidden: '⚠️ 這個同步連結是在別的裝置上建立的，這台裝置不能更新它。可以停止分享後重新建立。',
+        gone: '⚠️ 雲端上的分享不見了，請停止分享後重新建立。',
+        error: `⚠️ 同步失敗：${share.error || ''}`,
+      }[share.status] || (pending ? '🔄 同步中…' : `✅ 已同步・${timeLabel(share.pushedAt)}`);
+    return `<h3>🔄 同步連結</h3>
+      <p class="small share-status">${h(status)}</p>
+      <p class="muted small">你修改旅程後，對方打開 App 就會看到最新版本。</p>
+      <div class="row-btns">${shareBtn('cloud-link', '傳送連結')}${copyBtn('cloud-copy', '複製連結')}</div>
+      <button type="button" class="btn-text danger-text" data-share="cloud-stop" ${busy ? 'disabled' : ''}>${busy ? '處理中…' : '停止分享'}</button>`;
+  }
 
   dialog.innerHTML = `
     <form class="sheet-form" method="dialog">
@@ -262,7 +305,7 @@ export function openShareSheet(trip, { toast, copyText }) {
         <button type="button" class="btn-text strong" data-share="close">完成</button>
       </header>
       <div class="sheet-body">
-        <p class="muted small">對方會拿到這趟旅程的一份副本，之後各自修改、不會同步。</p>
+        <p class="field-label">分享的內容</p>
         <div class="share-options">
           <label class="check-row"><input type="checkbox" name="hideSensitive" ${opts.hideSensitive ? 'checked' : ''}>
             <span><b>隱藏訂位代號、訂房編號與訂房連結</b><small>有訂位代號和姓氏，就可能被拿去改票或取消</small></span></label>
@@ -272,9 +315,11 @@ export function openShareSheet(trip, { toast, copyText }) {
             <span><b>包含行李清單</b><small>對方會拿到未勾選的清單</small></span></label>
         </div>
 
+        ${cloudAllowed ? '<section class="share-block" data-cloud-block></section>' : ''}
+
         <section class="share-block">
-          <h3>📲 分享連結</h3>
-          <p class="muted small">對方點開連結，就能把這趟旅程加入他自己的旅行手帳。</p>
+          <h3>📸 一次性連結</h3>
+          <p class="muted small">傳一份現在這個版本的副本給對方，之後的修改不會同步。</p>
           <div class="row-btns">${shareBtn('link', '傳送連結')}${copyBtn('copy-link', '複製連結')}</div>
         </section>
 
@@ -291,9 +336,13 @@ export function openShareSheet(trip, { toast, copyText }) {
 
   const form = dialog.querySelector('form');
   const preview = dialog.querySelector('[data-share-preview]');
+  const cloudEl = dialog.querySelector('[data-cloud-block]');
   const linkButtons = dialog.querySelectorAll('[data-share="link"], [data-share="copy-link"]');
+  const renderCloud = () => {
+    if (cloudEl) cloudEl.innerHTML = cloudBlock();
+  };
 
-  // 選項一改就重新產生；連結要壓縮（非同步），先準備好，按鈕按下時才能立刻分享
+  // 選項一改就重新產生；一次性連結要壓縮（非同步），先準備好，按鈕按下時才能立刻分享
   async function update() {
     const current = ++version;
     text = shareText(trip, opts);
@@ -305,20 +354,62 @@ export function openShareSheet(trip, { toast, copyText }) {
     linkButtons.forEach((b) => (b.disabled = false));
   }
 
+  // 視窗開著時，同步狀態有變化就更新畫面
+  const unsubscribe = subscribe?.(() => {
+    trip = getTrip(trip.id) || trip;
+    renderCloud();
+  });
+  dialog.addEventListener('close', () => unsubscribe?.(), { once: true });
+
   form.addEventListener('change', (e) => {
-    if (e.target.name in opts) {
-      opts[e.target.name] = e.target.checked;
-      update();
-    }
+    if (!(e.target.name in opts)) return;
+    opts[e.target.name] = e.target.checked;
+    update();
+    if (trip.share) sync.updateOptions(trip.id, { ...opts });
   });
 
-  form.addEventListener('click', (e) => {
+  form.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-share]');
     if (!btn) return;
     const title = `${trip.emoji || '✈️'} ${trip.name}`;
+    const cloudUrl = trip.share ? sync.cloudLink(trip.share.id, base) : '';
     switch (btn.dataset.share) {
       case 'close':
         dialog.close();
+        break;
+      case 'cloud-start':
+        busy = true;
+        cloudError = '';
+        renderCloud();
+        try {
+          await sync.start(trip.id, { ...opts });
+          trip = getTrip(trip.id) || trip;
+          toast('同步連結已建立，可以傳給對方了');
+        } catch (err) {
+          cloudError = err?.message || '建立失敗，請稍後再試';
+        }
+        busy = false;
+        renderCloud();
+        break;
+      case 'cloud-link':
+        systemShare({ title, text: `${title}｜點連結加入旅行手帳，之後會自動同步`, url: cloudUrl }, () => copyText(cloudUrl, '連結'));
+        break;
+      case 'cloud-copy':
+        copyText(cloudUrl, '連結');
+        break;
+      case 'cloud-stop':
+        if (!confirm('停止分享後，對方會保留最後一次同步的版本，但不會再收到更新。確定要停止嗎？')) break;
+        busy = true;
+        renderCloud();
+        try {
+          await sync.stop(trip.id);
+          trip = getTrip(trip.id) || trip;
+          toast('已停止分享');
+        } catch (err) {
+          toast(`無法停止分享：${err?.message || '請稍後再試'}`);
+        }
+        busy = false;
+        renderCloud();
         break;
       case 'link':
         systemShare({ title, text: `${title}｜點連結加入旅行手帳`, url: link }, () => copyText(link, '連結'));
@@ -335,6 +426,7 @@ export function openShareSheet(trip, { toast, copyText }) {
     }
   });
 
+  renderCloud();
   update();
   dialog.showModal();
   dialog.querySelector('.sheet-body').scrollTop = 0;
@@ -342,8 +434,43 @@ export function openShareSheet(trip, { toast, copyText }) {
 
 /* ───────────── 收到分享 ───────────── */
 
-/** 收到分享連結時的預覽頁 */
-export function renderSharePreview(trip, existing, { standalone, href }) {
+function previewActions(existing, mode, shareId) {
+  const open = (id) => `<a class="btn primary" href="#/trip/${encodeURIComponent(id)}">打開旅程</a>`;
+  const copyBtn = '<button class="btn" data-action="import-shared" data-mode="copy">另存一份</button>';
+  const own = existing && (!existing.importedAt || existing.share?.id === shareId);
+
+  if (mode === 'follow') {
+    if (own) {
+      return `<div class="notice">這是你自己分享出去的旅程。</div><div class="row-btns">${open(existing.id)}</div>`;
+    }
+    if (existing?.follow?.id === shareId) {
+      return `<div class="notice">你已經加入這趟旅程了，對方修改後會自動同步。</div><div class="row-btns">${open(existing.id)}</div>`;
+    }
+    if (existing) {
+      return `<div class="notice">你手機上已經有這趟旅程。改成自動同步後，會用對方的最新版本取代它，之後跟著對方更新（唯讀）。</div>
+        <div class="row-btns">
+          <button class="btn primary" data-action="import-shared" data-mode="follow-replace">改成自動同步</button>${copyBtn}
+        </div>`;
+    }
+    return `<p class="muted small">加入後，對方修改的內容會自動同步到你這裡。這趟旅程在你手機上是唯讀的，行李清單則可以自己勾選。</p>
+      <div class="row-btns"><button class="btn primary block" data-action="import-shared" data-mode="follow">加入並自動同步</button></div>`;
+  }
+
+  if (own) {
+    return `<div class="notice">這是你自己建立的旅程，不需要再加入一次。</div>
+      <div class="row-btns">${open(existing.id)}${copyBtn}</div>`;
+  }
+  if (existing) {
+    return `<div class="notice">你之前已經加入過這趟旅程。更新後，會用這次分享的內容取代你手機上的版本（包含你自己改過的地方）。</div>
+      <div class="row-btns">
+        <button class="btn primary" data-action="import-shared" data-mode="replace">更新旅程</button>${copyBtn}
+      </div>`;
+  }
+  return `<div class="row-btns"><button class="btn primary block" data-action="import-shared" data-mode="new">加入我的旅程</button></div>`;
+}
+
+/** 收到分享連結時的預覽頁；mode：'snapshot'（一次性連結）或 'follow'（同步連結） */
+export function renderSharePreview(trip, existing, { standalone, href, mode = 'snapshot', shareId = '' }) {
   const n = trip.stays.reduce((sum, s) => sum + nights(s.checkIn, s.checkOut), 0);
   const flights = sortFlights(trip.flights)
     .map((f) => {
@@ -355,27 +482,10 @@ export function renderSharePreview(trip, existing, { standalone, href }) {
     .map((s) => `<li>🏨 <b>${h(s.name)}</b> <span class="muted">${h([formatDate(s.checkIn), nights(s.checkIn, s.checkOut) ? `${nights(s.checkIn, s.checkOut)} 晚` : ''].filter(Boolean).join('・'))}</span></li>`)
     .join('');
 
-  let actions;
-  if (existing && !existing.importedAt) {
-    actions = `<div class="notice">這是你自己建立的旅程，不需要再加入一次。</div>
-      <div class="row-btns">
-        <a class="btn primary" href="#/trip/${encodeURIComponent(existing.id)}">打開旅程</a>
-        <button class="btn" data-action="import-shared" data-mode="copy">另存一份</button>
-      </div>`;
-  } else if (existing) {
-    actions = `<div class="notice">你之前已經加入過這趟旅程。更新後，會用這次分享的內容取代你手機上的版本（包含你自己改過的地方）。</div>
-      <div class="row-btns">
-        <button class="btn primary" data-action="import-shared" data-mode="replace">更新旅程</button>
-        <button class="btn" data-action="import-shared" data-mode="copy">另存一份</button>
-      </div>`;
-  } else {
-    actions = `<div class="row-btns"><button class="btn primary block" data-action="import-shared" data-mode="new">加入我的旅程</button></div>`;
-  }
-
   return `
     <section class="hero share-hero">
       <div>
-        <p class="hero-label">有人分享了一趟旅程給你</p>
+        <p class="hero-label">${mode === 'follow' ? '🔄 有人和你同步分享了一趟旅程' : '有人分享了一趟旅程給你'}</p>
         <p class="share-title">${h(trip.emoji || '✈️')} ${h(trip.name)}</p>
         <p class="hero-sub">${h([trip.destination, formatRange(trip.startDate, trip.endDate)].filter(Boolean).join('・'))}</p>
       </div>
@@ -387,7 +497,7 @@ export function renderSharePreview(trip, existing, { standalone, href }) {
       <div class="stat"><b>${trip.checklist.length}</b><span>清單</span></div>
     </div>
     ${flights || stays ? `<section class="card"><ul class="share-list">${flights}${stays}</ul></section>` : ''}
-    <div class="share-actions">${actions}</div>
+    <div class="share-actions">${previewActions(existing, mode, shareId)}</div>
     ${standalone ? '' : `<section class="card share-tip">
       <p class="small"><b>📱 iPhone 已經把旅行手帳加到主畫面了嗎？</b></p>
       <p class="muted small">主畫面的 App 和 Safari／LINE 裡開的網頁，資料是分開存的。想加到主畫面的 App：複製這個連結，打開 App →「設定與備份」→「匯入分享的旅程」貼上。</p>

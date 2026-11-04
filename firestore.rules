@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// 旅行手帳的 Firestore 安全規則
+// 用法：Firebase 主控台 → Firestore → 規則 → 整段貼上 → 發布
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 每一份分享：shares/{分享代碼}
+    match /shares/{shareId} {
+
+      function validShare() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['owner', 'data', 'updatedAt', 'v'])
+          && d.owner is string
+          && d.data is string
+          && d.data.size() < 500000
+          && d.updatedAt is timestamp
+          && d.v is int;
+      }
+
+      // 知道分享代碼的人才能讀取那一份；不能列出所有分享
+      allow get: if true;
+      allow list: if false;
+
+      // 只有登入（App 會自動匿名登入）的人能建立，而且擁有者必須是自己
+      allow create: if request.auth != null
+        && request.resource.data.owner == request.auth.uid
+        && validShare();
+
+      // 只有建立的人能更新，而且不能把擁有者改成別人
+      allow update: if request.auth != null
+        && resource.data.owner == request.auth.uid
+        && request.resource.data.owner == request.auth.uid
+        && validShare();
+
+      // 只有建立的人能刪除（停止分享）
+      allow delete: if request.auth != null
+        && resource.data.owner == request.auth.uid;
+    }
+
+    // 其他資料一律拒絕
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

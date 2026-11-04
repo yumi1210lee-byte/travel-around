@@ -3,8 +3,9 @@ import { closeSheet, openForm } from './forms.js';
 import * as fx from './fx.js';
 import { computeFx } from './fxview.js';
 import { createSampleTrip } from './sample.js';
-import { decodeTrip, extractPayload, openShareSheet } from './share.js';
+import { decodeTrip, extractShareRoute, openShareSheet } from './share.js';
 import * as store from './store.js';
+import * as sync from './sync.js';
 import { copyText, toast } from './ui.js';
 import { isDate, toDateStr } from './utils.js';
 import { renderFxPage, renderHome, renderSettings, renderShareImport, renderTrip } from './views.js';
@@ -20,6 +21,7 @@ function parseRoute() {
   if (parts[0] === 'settings') return { name: 'settings' };
   if (parts[0] === 'fx') return { name: 'fx' };
   if (parts[0] === 'share' && parts[1]) return { name: 'share', payload: parts[1] };
+  if (parts[0] === 's' && parts[1]) return { name: 'follow-share', shareId: parts[1] };
   return { name: 'home' };
 }
 
@@ -63,23 +65,32 @@ function updateFxFields({ both = false } = {}) {
 
 /* ───────────── 收到的分享 ───────────── */
 
-let incoming = { payload: '', status: 'idle', trip: null };
+// key：'snap:<代碼>'（一次性連結）或 'cloud:<分享代碼>'（同步連結）
+let incoming = { key: '', status: 'idle', trip: null };
 
-function loadIncoming(payload) {
-  if (incoming.payload === payload) return;
-  incoming = { payload, status: 'loading', trip: null };
-  decodeTrip(payload)
-    .then((trip) => {
-      if (incoming.payload !== payload) return;
-      incoming = { payload, status: 'ready', trip };
+function loadIncoming(key, loader) {
+  if (incoming.key === key) return;
+  incoming = { key, status: 'loading', trip: null };
+  loader()
+    .then((result) => {
+      if (incoming.key !== key) return;
+      incoming = { key, status: 'ready', ...result };
       render();
     })
     .catch((err) => {
       console.warn('分享連結無法讀取', err);
-      if (incoming.payload !== payload) return;
-      incoming = { payload, status: 'error', trip: null };
+      if (incoming.key !== key) return;
+      incoming = { key, status: 'error', trip: null, error: err?.code || 'invalid' };
       render();
     });
+}
+
+/** 收到同步連結時，找出手機上相關的旅程（自己分享的、已經在追蹤的、或同一趟旅程） */
+function findRelated(shareId, trip) {
+  return (
+    store.getData().trips.find((t) => t.share?.id === shareId || t.follow?.id === shareId) ||
+    (trip?.id ? store.getTrip(trip.id) : null)
+  );
 }
 
 const isStandalone = () =>
@@ -108,9 +119,19 @@ function render() {
     app.innerHTML = renderFxPage(renderContext(null));
     document.title = `換匯・${APP_NAME}`;
   } else if (route.name === 'share') {
-    loadIncoming(route.payload);
+    loadIncoming(`snap:${route.payload}`, async () => ({ trip: await decodeTrip(route.payload) }));
     const existing = incoming.trip?.id ? store.getTrip(incoming.trip.id) : null;
     app.innerHTML = renderShareImport(incoming, existing, { standalone: isStandalone(), href: location.href });
+    document.title = `收到分享的旅程・${APP_NAME}`;
+  } else if (route.name === 'follow-share') {
+    loadIncoming(`cloud:${route.shareId}`, () => sync.loadShared(route.shareId));
+    const existing = incoming.trip ? findRelated(route.shareId, incoming.trip) : null;
+    app.innerHTML = renderShareImport(incoming, existing, {
+      standalone: isStandalone(),
+      href: location.href,
+      mode: 'follow',
+      shareId: route.shareId,
+    });
     document.title = `收到分享的旅程・${APP_NAME}`;
   } else if (route.name === 'settings') {
     app.innerHTML = renderSettings(data);
@@ -139,6 +160,10 @@ function render() {
 
   // 換匯頁、或總覽有外幣花費時，背景更新匯率（5 分鐘內不重抓）
   if (isFxRoute(route) || (route.name === 'trip' && route.tab === 'overview')) setTimeout(() => fx.refresh(), 0);
+  // 打開同步中的旅程時檢查有沒有新版本（30 秒內不重複檢查）
+  if (route.name === 'trip' && store.getTrip(route.id)?.follow) {
+    setTimeout(() => sync.refreshFollowed({ tripId: route.id }), 0);
+  }
 }
 
 /* ───────────── 小工具 ───────────── */
@@ -198,12 +223,15 @@ function openTripForm(trip) {
 
 const actions = {
   'new-trip': () => openTripForm(null),
-  'edit-trip': () => openTripForm(currentTrip()),
+  'edit-trip': () => {
+    const trip = currentTrip();
+    if (trip && !trip.follow) openTripForm(trip);
+  },
 
   add: (el) => {
     const trip = currentTrip();
     const { coll } = el.dataset;
-    if (!trip || !FORM_OF[coll]) return;
+    if (!trip || trip.follow || !FORM_OF[coll]) return;
     openForm(FORM_OF[coll], defaultsFor(coll, trip, el.dataset), {
       onSave: (values) => store.saveItem(trip.id, coll, values),
     });
@@ -213,7 +241,7 @@ const actions = {
     const trip = currentTrip();
     const { coll, id } = el.dataset;
     const item = trip?.[coll]?.find((x) => x.id === id);
-    if (!item) return;
+    if (!item || trip.follow) return;
     openForm(FORM_OF[coll], item, {
       onSave: (values) => store.saveItem(trip.id, coll, values),
       onDelete: () => {
@@ -229,24 +257,81 @@ const actions = {
 
   'share-trip': () => {
     const trip = currentTrip();
-    if (trip) openShareSheet(trip, { toast, copyText });
+    if (!trip) return;
+    openShareSheet(trip, {
+      toast,
+      copyText,
+      getTrip: store.getTrip,
+      subscribe: store.subscribe,
+      sync: {
+        enabled: sync.enabled,
+        start: sync.startSharing,
+        stop: sync.stopSharing,
+        updateOptions: sync.updateOptions,
+        cloudLink: sync.cloudLink,
+      },
+    });
+  },
+
+  'follow-refresh': async () => {
+    const trip = currentTrip();
+    if (!trip?.follow) return;
+    const updated = await sync.refreshFollowed({ tripId: trip.id, force: true });
+    const status = store.getTrip(trip.id)?.follow?.status;
+    if (!updated) toast(status === 'offline' ? '目前沒有網路' : status === 'gone' ? '對方已停止分享' : '已經是最新版本');
+  },
+
+  'follow-detach': () => {
+    const trip = currentTrip();
+    if (!trip?.follow) return;
+    if (!confirm('改成可以編輯後，就不會再收到對方的更新了。確定嗎？')) return;
+    store.setFollowMeta(trip.id, null);
+    toast('已改成你自己的旅程，可以編輯了');
+  },
+
+  'delete-followed': () => {
+    const trip = currentTrip();
+    if (!trip?.follow) return;
+    if (!confirm(`確定要從你的手機刪除「${trip.name}」？\n（不會影響分享給你的人）`)) return;
+    store.deleteTrip(trip.id);
+    location.hash = '#/';
+    toast('已刪除旅程');
+  },
+
+  'retry-incoming': () => {
+    incoming = { key: '', status: 'idle', trip: null };
+    render();
   },
 
   'import-shared': (el) => {
     if (incoming.status !== 'ready') return;
     const { mode } = el.dataset;
     const shared = incoming.trip;
-    const existing = shared.id ? store.getTrip(shared.id) : null;
-    // 自己建立的旅程不能被分享的版本蓋掉，只能另存
-    if (mode === 'replace' && !existing?.importedAt) return;
-    if (mode === 'new' && existing) return;
-    const trip =
-      mode === 'copy'
-        ? store.importTrip({ ...shared, name: `${shared.name}（副本）` }, { asCopy: true })
-        : store.importTrip(shared);
-    incoming = { payload: '', status: 'idle', trip: null };
+    const route = parseRoute();
+    const shareId = route.name === 'follow-share' ? route.shareId : '';
+    const existing = shareId ? findRelated(shareId, shared) : shared.id ? store.getTrip(shared.id) : null;
+    const own = existing && (!existing.importedAt || (shareId && existing.share?.id === shareId));
+    let trip;
+    if (mode === 'copy') {
+      trip = store.importTrip({ ...shared, name: `${shared.name}（副本）` }, { asCopy: true });
+    } else if (mode === 'follow' || mode === 'follow-replace') {
+      // 自己的旅程不能被分享的版本蓋掉
+      if (!shareId || own || (mode === 'follow' && existing)) return;
+      if (existing && existing.id !== shared.id) store.deleteTrip(existing.id);
+      trip = store.importTrip(shared, {
+        follow: { id: shareId, remoteUpdatedAt: incoming.updatedAt, status: 'ok', checkedAt: new Date().toISOString() },
+      });
+    } else {
+      if (mode === 'replace' && (!existing || own)) return;
+      if (mode === 'new' && existing) return;
+      trip = store.importTrip(shared);
+    }
+    incoming = { key: '', status: 'idle', trip: null };
     location.replace(`#/trip/${encodeURIComponent(trip.id)}`);
-    toast(mode === 'replace' ? '已更新旅程' : '已加入你的旅程');
+    toast(
+      { replace: '已更新旅程', follow: '已加入，之後會自動同步', 'follow-replace': '已改成自動同步' }[mode] ||
+        '已加入你的旅程',
+    );
   },
 
   'delete-check': (el) => {
@@ -366,9 +451,9 @@ app.addEventListener('submit', (e) => {
   const sharePaste = e.target.closest('[data-form="share-paste"]');
   if (sharePaste) {
     e.preventDefault();
-    const payload = extractPayload(sharePaste.elements.link.value);
-    if (!payload) return toast('找不到分享連結，請貼上完整的連結');
-    location.hash = `#/share/${payload}`;
+    const target = extractShareRoute(sharePaste.elements.link.value);
+    if (!target) return toast('找不到分享連結，請貼上完整的連結');
+    location.hash = target;
     return;
   }
   const form = e.target.closest('[data-form="checklist"]');
@@ -411,16 +496,30 @@ window.addEventListener('hashchange', () => {
 store.subscribe(render);
 fx.subscribe(render);
 
+// 雲端同步：資料一有變動就檢查要不要上傳；收到對方更新時提示
+store.subscribe(() => sync.checkPending());
+sync.onUpdate((e) => {
+  if (e.type === 'follow-updated' && e.trip) toast(`「${e.trip.name}」有新的更新`);
+});
+window.addEventListener('online', () => {
+  sync.checkPending({ retryFailed: true });
+  sync.refreshFollowed({ force: true });
+});
+
 // 換匯頁開著時，每分鐘檢查一次（實際 5 分鐘才會重抓）；App 回到前景時也更新
 setInterval(() => {
   if (document.visibilityState === 'visible' && isFxRoute()) fx.refresh();
 }, 60 * 1000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && isFxRoute()) fx.refresh();
+  if (document.visibilityState !== 'visible') return;
+  if (isFxRoute()) fx.refresh();
+  sync.refreshFollowed();
 });
 store.onSaveError(() => toast('⚠️ 儲存失敗：瀏覽器儲存空間無法使用'));
 
 render();
+sync.checkPending({ retryFailed: true });
+sync.refreshFollowed();
 
 /* ───────────── 離線與儲存 ───────────── */
 

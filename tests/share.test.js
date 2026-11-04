@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createSampleTrip } from '../js/sample.js';
 import {
-  buildSharedTrip, decodeTrip, encodeTrip, extractPayload, sanitizeSharedTrip, shareText, shareUrl,
+  buildSharedTrip, decodeTrip, encodeTrip, extractPayload, extractShareRoute, sanitizeSharedTrip, shareText, shareUrl,
 } from '../js/share.js';
 import { normalizeTrip } from '../js/store.js';
 
@@ -87,4 +87,11 @@ test('文字版行程：包含重點、依選項隱藏敏感資料', () => {
   assert.match(full, /☐ 日幣現金/);
   const noPrice = shareText(trip, { hideSensitive: true, hidePrices: true, includeChecklist: false });
   assert.doesNotMatch(noPrice, /TWD|JPY/);
+});
+
+test('貼上的文字可以辨識一次性連結與同步連結', () => {
+  assert.equal(extractShareRoute('https://x.io/#/share/v1.AbC'), '#/share/v1.AbC');
+  assert.equal(extractShareRoute('來加入！https://x.io/travel-around/#/s/Qx8_a-Zt3kLmNoPq12Rs3w 謝謝'), '#/s/Qx8_a-Zt3kLmNoPq12Rs3w');
+  assert.equal(extractShareRoute('https://x.io/#/s/short'), '');
+  assert.equal(extractShareRoute('hello'), '');
 });

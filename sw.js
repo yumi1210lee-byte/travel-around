@@ -1,14 +1,16 @@
 // Service worker：讓 App 在沒有網路時也能開啟。
 // 策略：先用快取立即顯示，同時在背景向網路抓新版本更新快取（stale-while-revalidate）。
 // 修改檔案清單時記得調高版本號。
-const CACHE = 'travel-around-v4';
+const CACHE = 'travel-around-v5';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/app.js',
+  './js/cloud.js',
   './js/constants.js',
+  './js/firebase-config.js',
   './js/forms.js',
   './js/fx.js',
   './js/fxview.js',
@@ -16,6 +18,7 @@ const ASSETS = [
   './js/sample.js',
   './js/share.js',
   './js/store.js',
+  './js/sync.js',
   './js/ui.js',
   './js/utils.js',
   './js/views.js',
