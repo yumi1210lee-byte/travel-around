@@ -1,4 +1,4 @@
-import { APP_NAME, PACKING_TEMPLATE } from './constants.js';
+import { APP_NAME, PACKING_TEMPLATE, tripIconId } from './constants.js';
 import { closeSheet, openForm } from './forms.js';
 import * as fx from './fx.js';
 import { computeFx } from './fxview.js';
@@ -202,7 +202,7 @@ function defaultsFor(coll, trip, extra = {}) {
 }
 
 function openTripForm(trip) {
-  openForm('trip', trip || { emoji: '✈️' }, {
+  openForm('trip', trip ? { ...trip, icon: tripIconId(trip) } : { icon: 'plane' }, {
     onSave: (values) => {
       const saved = store.saveTrip(values);
       if (!trip) location.hash = `#/trip/${encodeURIComponent(saved.id)}`;

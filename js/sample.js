@@ -6,7 +6,7 @@ export function createSampleTrip(today) {
   return {
     name: '東京賞楓 5 日（範例）',
     destination: '日本・東京',
-    emoji: '🍁',
+    icon: 'leaf',
     startDate: d(0),
     endDate: d(4),
     notes: '這是範例旅程，可以隨意修改或刪除。\n入境前記得填 Visit Japan Web。',

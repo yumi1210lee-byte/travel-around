@@ -1,5 +1,6 @@
 // 表單定義與底部彈出視窗（bottom sheet）
-import { CURRENCIES, PLAN_CATEGORIES, TRIP_EMOJIS } from './constants.js';
+import { CURRENCIES, PLAN_CATEGORIES, TRIP_ICONS } from './constants.js';
+import { icon } from './icons.js';
 import { escapeHtml as h, normalizeFlightNo } from './utils.js';
 
 const upper = (v) => v.toUpperCase();
@@ -15,7 +16,7 @@ export const FORMS = {
     fields: [
       { name: 'name', label: '旅程名稱', required: true, placeholder: '例：東京賞楓 5 日' },
       { name: 'destination', label: '目的地', placeholder: '例：日本・東京' },
-      { name: 'emoji', label: '圖示', type: 'emoji' },
+      { name: 'icon', label: '圖示', type: 'icon' },
       {
         row: [
           { name: 'startDate', label: '出發日', type: 'date' },
@@ -149,12 +150,12 @@ function renderField(field, values) {
   const id = `f-${field.name}`;
   const label = `${h(field.label)}${field.required ? ' <i aria-hidden="true">*</i>' : ''}`;
 
-  if (field.type === 'emoji') {
-    const options = TRIP_EMOJIS.map(
-      (e) =>
-        `<label><input type="radio" name="${field.name}" value="${e}" ${e === value ? 'checked' : ''}><span>${e}</span></label>`,
+  if (field.type === 'icon') {
+    const options = TRIP_ICONS.map(
+      (t) =>
+        `<label title="${h(t.label)}"><input type="radio" name="${field.name}" value="${t.id}" aria-label="${h(t.label)}" ${t.id === value ? 'checked' : ''}><span>${icon(t.id)}</span></label>`,
     ).join('');
-    return `<fieldset class="field"><legend class="field-label">${label}</legend><div class="emoji-picker">${options}</div></fieldset>`;
+    return `<fieldset class="field"><legend class="field-label">${label}</legend><div class="icon-picker">${options}</div></fieldset>`;
   }
 
   const attrs = [

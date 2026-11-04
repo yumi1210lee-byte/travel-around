@@ -85,3 +85,13 @@ test('時間軸：依日期排序、跨日抵達、每晚住宿', () => {
   assert.equal(days[2].stays.length, 0);
   assert.deepEqual(undated.map((i) => i.ref.id), ['p2']);
 });
+
+test('旅程圖示：新圖示、舊版 emoji 對應、預設飛機', async () => {
+  const { tripIconId, tripEmoji } = await import('../js/constants.js');
+  assert.equal(tripIconId({ icon: 'torii' }), 'torii');
+  assert.equal(tripIconId({ emoji: '🍁' }), 'leaf');
+  assert.equal(tripIconId({ emoji: '🗽' }), 'city');
+  assert.equal(tripIconId({ icon: '__proto__' }), 'plane');
+  assert.equal(tripIconId({}), 'plane');
+  assert.equal(tripEmoji({ icon: 'snow' }), '❄️');
+});

@@ -2,7 +2,8 @@
 // 1. 分享連結：把旅程壓縮後放在網址的 # 後面。# 後面的內容不會傳到伺服器，
 //    資料只存在連結本身，對方打開就能加入自己的旅行手帳。
 // 2. 文字版：整理成好讀的文字，貼到 LINE 等聊天軟體。
-import { PLAN_CATEGORIES } from './constants.js';
+import { PLAN_CATEGORIES, tripEmoji, tripIconId } from './constants.js';
+import { icon } from './icons.js';
 import { FORMS } from './forms.js';
 import {
   diffDays,
@@ -31,7 +32,8 @@ const MAX_TEXT = 2000;
 // 每種項目可以分享的欄位，直接取自表單定義
 const fieldsOf = (type) => FORMS[type].fields.flatMap((f) => (f.row ? f.row : [f]));
 const SCHEMA = {
-  trip: fieldsOf('trip'),
+  // emoji：舊版分享連結的圖示欄位，收到時還認得
+  trip: [...fieldsOf('trip'), { name: 'emoji' }],
   flights: fieldsOf('flight'),
   stays: fieldsOf('stay'),
   plans: fieldsOf('plan'),
@@ -161,7 +163,7 @@ export function shareText(trip, opts = DEFAULT_SHARE_OPTIONS) {
   const blocks = [];
   blocks.push(
     [
-      `${t.emoji || '✈️'} ${t.name}`,
+      `${tripEmoji(t)} ${t.name}`,
       [t.destination, formatRange(t.startDate, t.endDate)].filter(Boolean).join('｜'),
       t.members.length ? `👥 ${t.members.map((m) => m.name).join('、')}` : '',
     ]
@@ -379,7 +381,7 @@ export function openShareSheet(initialTrip, { toast, copyText, sync, getTrip, su
   form.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-share]');
     if (!btn) return;
-    const title = `${trip.emoji || '✈️'} ${trip.name}`;
+    const title = `${tripEmoji(trip)} ${trip.name}`;
     const cloudUrl = trip.share ? sync.cloudLink(trip.share.id, base) : '';
     switch (btn.dataset.share) {
       case 'close':
@@ -494,7 +496,7 @@ export function renderSharePreview(trip, existing, { standalone, href, mode = 's
     <section class="hero share-hero">
       <div>
         <p class="hero-label">${mode === 'follow' ? '🔄 有人和你同步分享了一趟旅程' : '有人分享了一趟旅程給你'}</p>
-        <p class="share-title">${h(trip.emoji || '✈️')} ${h(trip.name)}</p>
+        <p class="share-title">${icon(tripIconId(trip), 'title-icon')}${h(trip.name)}</p>
         <p class="hero-sub">${h([trip.destination, formatRange(trip.startDate, trip.endDate)].filter(Boolean).join('・'))}</p>
       </div>
     </section>

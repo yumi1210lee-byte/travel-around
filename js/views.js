@@ -1,5 +1,5 @@
 // 畫面：每個函式回傳 HTML 字串。所有使用者輸入都必須經過 h() 跳脫。
-import { APP_NAME, APP_VERSION, CURRENCIES, CURRENCY_INFO, PLAN_CATEGORIES } from './constants.js';
+import { APP_NAME, APP_VERSION, CURRENCIES, CURRENCY_INFO, PLAN_CATEGORIES, tripIconId } from './constants.js';
 import { convert } from './fx.js';
 import { formatAmount, renderConverter } from './fxview.js';
 import { renderSharePreview } from './share.js';
@@ -65,9 +65,10 @@ function tripCard(trip, today) {
     trip.members?.length && `${trip.members.length} 人`,
   ]
     .filter(Boolean)
+    .map((item) => `<span class="nowrap">${item}</span>`)
     .join('・');
   return `<a class="card trip-card state-${status.state}" href="${tripHref(trip)}">
-    <div class="trip-emoji" aria-hidden="true">${h(trip.emoji || '✈️')}</div>
+    <div class="trip-icon" aria-hidden="true">${icon(tripIconId(trip))}</div>
     <div class="trip-info">
       <h3>${h(trip.name)}</h3>
       ${trip.destination ? `<p>${h(trip.destination)}</p>` : ''}
@@ -181,7 +182,7 @@ export function renderTrip(trip, tab, ctx) {
     <header class="topbar">
       <a class="icon-btn" href="#/" aria-label="回到旅程列表">${icon('back')}</a>
       <div class="topbar-title">
-        <h1>${h(trip.emoji || '')} ${h(trip.name)}</h1>
+        <h1>${icon(tripIconId(trip), 'title-icon')}${h(trip.name)}</h1>
         <p>${h(subtitle)}</p>
       </div>
       <button class="icon-btn" data-action="share-trip" aria-label="分享旅程">${icon('share')}</button>
