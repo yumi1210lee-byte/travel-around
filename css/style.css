@@ -578,3 +578,7 @@ fieldset.field { border: 0; padding: 0; }
   border-left: 1.5px dotted var(--muted); opacity: 0.7;
 }
 .has-end sup { font-size: 9px; font-weight: 700; color: var(--warm); margin-left: 1px; }
+
+/* 航班卡片：出發／抵達航廈寫在各自的時間下面 */
+.pass-end .terminal { margin-top: 2px; font-size: 12px; color: var(--muted); }
+.pass-end .terminal b { color: var(--text); font-weight: 700; }

@@ -107,3 +107,9 @@ test('成員：預設只分享名字與備註，電話與護照英文姓名會�
   assert.match(shareText(trip), /👥 小美、阿哲/);
   assert.deepEqual(sanitizeSharedTrip({ name: 'x', members: [{ name: '' }, { name: 'A', evil: 1 }] }).members, [{ name: 'A' }]);
 });
+
+test('文字版：出發與抵達航廈', () => {
+  const text = shareText(trip);
+  assert.match(text, /出發航廈 T2・抵達航廈 T1/);
+  assert.equal(buildSharedTrip(trip).flights[0].arrivalTerminal, 'T1');
+});

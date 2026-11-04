@@ -183,7 +183,8 @@ export function shareText(trip, opts = DEFAULT_SHARE_OPTIONS) {
         `${f.from || f.fromCity || '?'} ${depTime} → ${f.to || f.toCity || '?'} ${arrTime}${shift ? `（${shift > 0 ? '+' : ''}${shift} 天）` : ''}`.replace(/ +/g, ' ').trim(),
       );
       const extra = [
-        f.terminal && `航廈 ${f.terminal}`,
+        f.terminal && `出發航廈 ${f.terminal}`,
+        f.arrivalTerminal && `抵達航廈 ${f.arrivalTerminal}`,
         f.gate && `登機門 ${f.gate}`,
         f.seat && `座位 ${f.seat}`,
         f.baggage && `行李 ${f.baggage}`,

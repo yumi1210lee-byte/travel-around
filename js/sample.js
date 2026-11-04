@@ -16,14 +16,14 @@ export function createSampleTrip(today) {
         airline: '長榮航空', flightNo: 'BR198',
         from: 'TPE', fromCity: '台北桃園', to: 'NRT', toCity: '東京成田',
         departAt: `${d(0)}T08:50`, arriveAt: `${d(0)}T13:15`,
-        terminal: 'T2', gate: '', seat: '32A', bookingRef: 'ABC123', baggage: '23kg × 2',
+        terminal: 'T2', arrivalTerminal: 'T1', gate: '', seat: '32A', bookingRef: 'ABC123', baggage: '23kg × 2',
         price: 15800, currency: 'TWD', notes: '來回票價',
       },
       {
         airline: '長榮航空', flightNo: 'BR197',
         from: 'NRT', fromCity: '東京成田', to: 'TPE', toCity: '台北桃園',
         departAt: `${d(4)}T14:30`, arriveAt: `${d(4)}T17:20`,
-        terminal: 'T1', seat: '30K', bookingRef: 'ABC123', baggage: '23kg × 2',
+        terminal: 'T1', arrivalTerminal: 'T2', seat: '30K', bookingRef: 'ABC123', baggage: '23kg × 2',
       },
     ],
     stays: [

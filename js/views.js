@@ -229,6 +229,14 @@ function hero(trip, status) {
   }
 }
 
+/** 出發／抵達航廈：「航廈 T2 → T1」，只有一邊時寫清楚是哪一邊 */
+function terminalText(f) {
+  if (f.terminal && f.arrivalTerminal) return `航廈 ${f.terminal} → ${f.arrivalTerminal}`;
+  if (f.terminal) return `出發航廈 ${f.terminal}`;
+  if (f.arrivalTerminal) return `抵達航廈 ${f.arrivalTerminal}`;
+  return '';
+}
+
 /** 時間軸上每一項的圖示、標題與副標（總覽和行程分頁共用） */
 function entryInfo(entry) {
   const r = entry.ref;
@@ -246,7 +254,7 @@ function entryInfo(entry) {
       endShift = depDate && arrDate ? diffDays(depDate, arrDate) : 0;
       emoji = '🛫';
       title = routeText(r);
-      sub = [[normalizeFlightNo(r.flightNo), r.airline].filter(Boolean).join(' '), r.terminal ? `航廈 ${r.terminal}` : '']
+      sub = [[normalizeFlightNo(r.flightNo), r.airline].filter(Boolean).join(' '), terminalText(r)]
         .filter(Boolean)
         .join('・');
       break;
@@ -254,7 +262,9 @@ function entryInfo(entry) {
     case 'arrival':
       emoji = '🛬';
       title = `抵達 ${r.toCity || r.to || ''}`;
-      sub = [normalizeFlightNo(r.flightNo), routeText(r)].filter(Boolean).join('・');
+      sub = [normalizeFlightNo(r.flightNo), routeText(r), r.arrivalTerminal && `航廈 ${r.arrivalTerminal}`]
+        .filter(Boolean)
+        .join('・');
       break;
     case 'checkin':
       emoji = '🏨';
@@ -452,7 +462,6 @@ function flightCard(f) {
   const dayShift = depDate && arrDate ? diffDays(depDate, arrDate) : 0;
   const no = normalizeFlightNo(f.flightNo);
   const details = [
-    ['航廈', f.terminal],
     ['登機門', f.gate],
     ['座位', f.seat],
     ['行李', f.baggage],
@@ -468,12 +477,14 @@ function flightCard(f) {
         <div class="code">${h(f.from || '—')}</div>
         <div class="city">${h(f.fromCity || '')}</div>
         <div class="time">${h(depTime || '--:--')}</div>
+        ${f.terminal ? `<div class="terminal">出發航廈 <b>${h(f.terminal)}</b></div>` : ''}
       </div>
       <div class="pass-mid" aria-hidden="true">${icon('plane', 'plane')}</div>
       <div class="pass-end right">
         <div class="code">${h(f.to || '—')}</div>
         <div class="city">${h(f.toCity || '')}</div>
         <div class="time">${h(arrTime || '--:--')}${dayShift ? `<sup>${dayShift > 0 ? '+' : ''}${dayShift}</sup>` : ''}</div>
+        ${f.arrivalTerminal ? `<div class="terminal">抵達航廈 <b>${h(f.arrivalTerminal)}</b></div>` : ''}
       </div>
     </div>
     ${details.length ? `<dl class="pass-details">${details.map(([k, v]) => `<div><dt>${k}</dt><dd>${h(v)}</dd></div>`).join('')}</dl>` : ''}

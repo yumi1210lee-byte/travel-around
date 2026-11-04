@@ -53,8 +53,13 @@ export const FORMS = {
       { name: 'arriveAt', label: '抵達時間（當地）', type: 'datetime-local' },
       {
         row: [
-          { name: 'terminal', label: '航廈', placeholder: 'T2' },
-          { name: 'gate', label: '登機門', placeholder: 'C5' },
+          { name: 'terminal', label: '出發航廈', placeholder: 'T2', transform: upper },
+          { name: 'arrivalTerminal', label: '抵達航廈', placeholder: 'T1', transform: upper },
+        ],
+      },
+      {
+        row: [
+          { name: 'gate', label: '登機門', placeholder: 'C5', transform: upper },
           { name: 'seat', label: '座位', placeholder: '32A', transform: upper },
         ],
       },
