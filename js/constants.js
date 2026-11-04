@@ -12,10 +12,36 @@ export const PLAN_CATEGORIES = [
   { value: 'other', label: '其他', emoji: '📝' },
 ];
 
-export const CURRENCIES = [
-  'TWD', 'JPY', 'KRW', 'USD', 'EUR', 'HKD', 'CNY', 'THB', 'SGD', 'MYR',
-  'VND', 'PHP', 'IDR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF',
-];
+export const CURRENCY_INFO = {
+  TWD: { name: '新台幣', flag: '🇹🇼' },
+  JPY: { name: '日圓', flag: '🇯🇵' },
+  KRW: { name: '韓元', flag: '🇰🇷' },
+  USD: { name: '美元', flag: '🇺🇸' },
+  EUR: { name: '歐元', flag: '🇪🇺' },
+  HKD: { name: '港幣', flag: '🇭🇰' },
+  CNY: { name: '人民幣', flag: '🇨🇳' },
+  THB: { name: '泰銖', flag: '🇹🇭' },
+  SGD: { name: '新加坡幣', flag: '🇸🇬' },
+  MYR: { name: '馬來西亞令吉', flag: '🇲🇾' },
+  VND: { name: '越南盾', flag: '🇻🇳' },
+  PHP: { name: '菲律賓披索', flag: '🇵🇭' },
+  IDR: { name: '印尼盾', flag: '🇮🇩' },
+  GBP: { name: '英鎊', flag: '🇬🇧' },
+  AUD: { name: '澳幣', flag: '🇦🇺' },
+  NZD: { name: '紐西蘭幣', flag: '🇳🇿' },
+  CAD: { name: '加拿大幣', flag: '🇨🇦' },
+  CHF: { name: '瑞士法郎', flag: '🇨🇭' },
+  MOP: { name: '澳門幣', flag: '🇲🇴' },
+  TRY: { name: '土耳其里拉', flag: '🇹🇷' },
+  AED: { name: '阿聯酋迪拉姆', flag: '🇦🇪' },
+  INR: { name: '印度盧比', flag: '🇮🇳' },
+  CZK: { name: '捷克克朗', flag: '🇨🇿' },
+  SEK: { name: '瑞典克朗', flag: '🇸🇪' },
+};
+export const CURRENCIES = Object.keys(CURRENCY_INFO);
+
+/** 這些幣別通常不用小數 */
+export const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'IDR', 'TWD']);
 
 export const PACKING_TEMPLATE = [
   '護照（效期 6 個月以上）',

@@ -1,5 +1,7 @@
 // 畫面：每個函式回傳 HTML 字串。所有使用者輸入都必須經過 h() 跳脫。
-import { APP_NAME, APP_VERSION, CURRENCIES, PLAN_CATEGORIES } from './constants.js';
+import { APP_NAME, APP_VERSION, CURRENCIES, CURRENCY_INFO, PLAN_CATEGORIES } from './constants.js';
+import { convert } from './fx.js';
+import { formatAmount, renderConverter } from './fxview.js';
 import { icon } from './icons.js';
 import {
   buildTimeline,
@@ -110,6 +112,7 @@ export function renderHome(data) {
   return `
     <header class="topbar">
       <div class="topbar-title"><h1>${APP_NAME}</h1></div>
+      <a class="icon-btn" href="#/fx" aria-label="換匯">${icon('exchange')}</a>
       <a class="icon-btn" href="#/settings" aria-label="設定與備份">${icon('settings')}</a>
     </header>
     <main class="page">${body}</main>
@@ -124,6 +127,7 @@ const TABS = [
   { id: 'stays', label: '住宿', icon: 'bed' },
   { id: 'plans', label: '行程', icon: 'calendar' },
   { id: 'checklist', label: '清單', icon: 'checks' },
+  { id: 'fx', label: '換匯', icon: 'exchange' },
 ];
 
 const FAB = {
@@ -132,9 +136,10 @@ const FAB = {
   plans: ['plans', '新增行程'],
 };
 
-export function renderTrip(trip, tab) {
+export function renderTrip(trip, tab, ctx) {
   if (!TABS.some((t) => t.id === tab)) tab = 'overview';
-  const content = { overview, flights, stays, plans, checklist }[tab](trip);
+  const fx = () => renderConverter(ctx.fx, ctx.fxInput);
+  const content = { overview, flights, stays, plans, checklist, fx }[tab](trip, ctx);
   const fab = FAB[tab];
   const subtitle = [trip.destination, formatRange(trip.startDate, trip.endDate)].filter(Boolean).join('・');
 
@@ -249,7 +254,33 @@ function daySection(trip, day, today) {
   </section>`;
 }
 
-function overview(trip) {
+function costsCard(trip, { fx, homeCurrency }) {
+  const totals = Object.entries(totalsByCurrency([...trip.flights, ...trip.stays, ...trip.plans]));
+  if (!totals.length) return '';
+  const rates = fx.rates;
+  const converted = totals.map(([cur, amt]) => (cur === homeCurrency ? amt : convert(amt, cur, homeCurrency, rates)));
+  const canSum = converted.every(Number.isFinite);
+  const needsFx = totals.some(([cur]) => cur !== homeCurrency);
+  const rows = totals
+    .map(([cur, amt], i) => {
+      const approx = cur !== homeCurrency && Number.isFinite(converted[i])
+        ? `<small>≈ ${h(homeCurrency)} ${formatAmount(converted[i], homeCurrency)}</small>`
+        : '';
+      return `<li><span>${h(cur)}</span><span class="cost-amt"><b>${h(formatMoney(amt, ''))}</b>${approx}</span></li>`;
+    })
+    .join('');
+  const total = needsFx && canSum
+    ? `<li class="cost-total"><span>合計約</span><b>${h(homeCurrency)} ${formatAmount(converted.reduce((a, b) => a + b, 0), homeCurrency)}</b></li>`
+    : '';
+  const hint = needsFx && !canSum
+    ? `<p class="muted small">連上網路取得匯率後，會自動換算成 ${h(homeCurrency)}。</p>`
+    : needsFx
+      ? '<p class="muted small">依目前匯率換算，僅供參考。</p>'
+      : '';
+  return `<section class="card costs"><h2 class="card-title">已記錄花費</h2><ul>${rows}${total}</ul>${hint}</section>`;
+}
+
+function overview(trip, ctx) {
   const today = toDateStr();
   const now = nowLocal();
   const status = tripStatus(trip, today);
@@ -286,12 +317,7 @@ function overview(trip) {
     <a class="stat" href="${tripHref(trip, 'checklist')}" data-replace><b>${done}/${trip.checklist.length}</b><span>清單</span></a>
   </div>`;
 
-  const totals = Object.entries(totalsByCurrency([...trip.flights, ...trip.stays, ...trip.plans]));
-  const costs = totals.length
-    ? `<section class="card costs"><h2 class="card-title">已記錄花費</h2>
-        <ul>${totals.map(([cur, amt]) => `<li><span>${h(cur)}</span><b>${h(formatMoney(amt, ''))}</b></li>`).join('')}</ul>
-      </section>`
-    : '';
+  const costs = costsCard(trip, ctx);
 
   const todayDay = status.state === 'ongoing' ? timeline.days.find((d) => d.date === today) : null;
   const days = timeline.days.length
@@ -521,10 +547,10 @@ export function renderSettings(data) {
       </section>
 
       <section class="card">
-        <h2 class="card-title">預設幣別</h2>
-        <p class="muted small">新增航班、住宿、行程時預先帶入的幣別。</p>
+        <h2 class="card-title">主要幣別</h2>
+        <p class="muted small">新增航班、住宿、行程時預先帶入，也是花費換算的目標幣別。</p>
         <select data-change="currency" aria-label="預設幣別">
-          ${CURRENCIES.map((c) => `<option value="${c}" ${c === data.settings.currency ? 'selected' : ''}>${c}</option>`).join('')}
+          ${CURRENCIES.map((c) => `<option value="${c}" ${c === data.settings.currency ? 'selected' : ''}>${CURRENCY_INFO[c].flag} ${c} ${CURRENCY_INFO[c].name}</option>`).join('')}
         </select>
       </section>
 
@@ -542,4 +568,15 @@ export function renderSettings(data) {
 
       <p class="muted small center">${APP_NAME} v${APP_VERSION}・共 ${data.trips.length} 趟旅程</p>
     </main>`;
+}
+
+/* ───────────── 換匯（獨立頁面） ───────────── */
+
+export function renderFxPage(ctx) {
+  return `
+    <header class="topbar">
+      <a class="icon-btn" href="#/" aria-label="回到旅程列表">${icon('back')}</a>
+      <div class="topbar-title"><h1>換匯</h1></div>
+    </header>
+    <main class="page">${renderConverter(ctx.fx, ctx.fxInput)}</main>`;
 }

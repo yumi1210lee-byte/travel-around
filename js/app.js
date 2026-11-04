@@ -1,9 +1,11 @@
 import { APP_NAME, PACKING_TEMPLATE } from './constants.js';
 import { closeSheet, openForm } from './forms.js';
+import * as fx from './fx.js';
+import { computeFx } from './fxview.js';
 import { createSampleTrip } from './sample.js';
 import * as store from './store.js';
 import { isDate, toDateStr } from './utils.js';
-import { renderHome, renderSettings, renderTrip } from './views.js';
+import { renderFxPage, renderHome, renderSettings, renderTrip } from './views.js';
 
 const app = document.getElementById('app');
 const FORM_OF = { flights: 'flight', stays: 'stay', plans: 'plan' };
@@ -14,6 +16,7 @@ function parseRoute() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   if (parts[0] === 'trip' && parts[1]) return { name: 'trip', id: parts[1], tab: parts[2] || 'overview' };
   if (parts[0] === 'settings') return { name: 'settings' };
+  if (parts[0] === 'fx') return { name: 'fx' };
   return { name: 'home' };
 }
 
@@ -22,19 +25,61 @@ const currentTrip = () => {
   return route.name === 'trip' ? store.getTrip(route.id) : null;
 };
 
+/* ───────────── 換匯狀態 ───────────── */
+
+// 最後輸入的是哪一邊（a = 上方原幣別、b = 下方換算幣別）與輸入內容
+let fxDraft = { side: 'a', value: '1,000' };
+
+function fxPair(trip) {
+  const s = store.getData().settings;
+  const to = s.fxTo || s.currency || 'TWD';
+  let from = s.fxFrom || (trip?.lastCurrency && trip.lastCurrency !== to ? trip.lastCurrency : 'JPY');
+  if (from === to) from = to === 'USD' ? 'JPY' : 'USD';
+  return { from, to };
+}
+
+const isFxRoute = (route = parseRoute()) => route.name === 'fx' || (route.name === 'trip' && route.tab === 'fx');
+
+function renderContext(trip) {
+  return {
+    fx: fx.getFx(),
+    fxInput: { ...fxPair(trip), ...fxDraft },
+    homeCurrency: store.getData().settings.currency || 'TWD',
+  };
+}
+
+/** 打字時只更新另一個欄位，不重畫整頁（保持游標位置） */
+function updateFxFields({ both = false } = {}) {
+  const a = app.querySelector('[data-fx-input="a"]');
+  const b = app.querySelector('[data-fx-input="b"]');
+  if (!a || !b) return;
+  const out = computeFx({ ...fxPair(currentTrip()), ...fxDraft }, fx.getFx().rates);
+  if (both || fxDraft.side === 'b') a.value = out.a;
+  if (both || fxDraft.side === 'a') b.value = out.b;
+}
+
 let lastRouteKey = '';
+let restoringFocus = false;
 
 function render() {
   const route = parseRoute();
   const data = store.getData();
+  // 重畫前記下正在輸入的換匯欄位，重畫後還原焦點與游標
+  const active = document.activeElement;
+  const focusedFx = app.contains(active) ? active.dataset?.fxInput : null;
+  const selection = focusedFx ? [active.selectionStart, active.selectionEnd, active.selectionDirection] : null;
+
   if (route.name === 'trip') {
     const trip = store.getTrip(route.id);
     if (!trip) {
       location.replace('#/');
       return;
     }
-    app.innerHTML = renderTrip(trip, route.tab);
+    app.innerHTML = renderTrip(trip, route.tab, renderContext(trip));
     document.title = `${trip.name}・${APP_NAME}`;
+  } else if (route.name === 'fx') {
+    app.innerHTML = renderFxPage(renderContext(null));
+    document.title = `換匯・${APP_NAME}`;
   } else if (route.name === 'settings') {
     app.innerHTML = renderSettings(data);
     document.title = `設定・${APP_NAME}`;
@@ -46,7 +91,22 @@ function render() {
   if (key !== lastRouteKey) {
     window.scrollTo(0, 0);
     lastRouteKey = key;
+  } else if (focusedFx) {
+    const el = app.querySelector(`[data-fx-input="${focusedFx}"]`);
+    if (el) {
+      restoringFocus = true;
+      el.focus({ preventScroll: true });
+      restoringFocus = false;
+      try {
+        el.setSelectionRange(...selection);
+      } catch {
+        /* 某些輸入框不支援 */
+      }
+    }
   }
+
+  // 換匯頁、或總覽有外幣花費時，背景更新匯率（5 分鐘內不重抓）
+  if (isFxRoute(route) || (route.name === 'trip' && route.tab === 'overview')) setTimeout(() => fx.refresh(), 0);
 }
 
 /* ───────────── 小工具 ───────────── */
@@ -195,6 +255,24 @@ const actions = {
     toast('已載入範例旅程');
   },
 
+  'fx-swap': () => {
+    const { from, to } = fxPair(currentTrip());
+    store.updateSettings({ fxFrom: to, fxTo: from });
+  },
+
+  'fx-refresh': () => {
+    fx.refresh({ force: true }).then((s) => {
+      if (s.status === 'error') toast('無法更新匯率，請檢查網路');
+      else if (s.status === 'ok') toast('匯率已更新');
+    });
+  },
+
+  'fx-pick': (el) => {
+    fxDraft = { side: 'a', value: Number(el.dataset.amount).toLocaleString('en-US') };
+    updateFxFields({ both: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+
   'clear-all': () => {
     if (!confirm('確定要清除所有旅程資料？此動作無法復原。\n建議先匯出備份。')) return;
     store.clearAll();
@@ -210,7 +288,16 @@ const changeActions = {
   },
   currency: (el) => {
     store.updateSettings({ currency: el.value });
-    toast(`預設幣別：${el.value}`);
+    toast(`主要幣別：${el.value}`);
+  },
+  'fx-from': (el) => {
+    const { from, to } = fxPair(currentTrip());
+    // 選到跟另一邊一樣的幣別時，直接對調
+    store.updateSettings(el.value === to ? { fxFrom: to, fxTo: from } : { fxFrom: el.value, fxTo: to });
+  },
+  'fx-to': (el) => {
+    const { from, to } = fxPair(currentTrip());
+    store.updateSettings(el.value === from ? { fxFrom: to, fxTo: from } : { fxFrom: from, fxTo: el.value });
   },
   import: async (el) => {
     const file = el.files?.[0];
@@ -259,12 +346,43 @@ app.addEventListener('submit', (e) => {
   app.querySelector('[data-form="checklist"] input')?.focus();
 });
 
+app.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-fx-input]');
+  if (!el) return;
+  fxDraft = { side: el.dataset.fxInput, value: el.value };
+  updateFxFields();
+});
+
+// 點金額欄位時全選，方便直接輸入新數字
+app.addEventListener('focusin', (e) => {
+  const el = e.target.closest('[data-fx-input]');
+  if (!el || restoringFocus) return;
+  const before = el.value;
+  // 延後一點才全選（iOS 點擊後會重設游標）；若已經開始輸入就不要動
+  setTimeout(() => {
+    if (document.activeElement === el && el.value === before) el.setSelectionRange(0, el.value.length);
+  }, 0);
+});
+
+app.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.matches('[data-fx-input]')) e.target.blur();
+});
+
 window.addEventListener('hashchange', () => {
   closeSheet();
   render();
 });
 
 store.subscribe(render);
+fx.subscribe(render);
+
+// 換匯頁開著時，每分鐘檢查一次（實際 5 分鐘才會重抓）；App 回到前景時也更新
+setInterval(() => {
+  if (document.visibilityState === 'visible' && isFxRoute()) fx.refresh();
+}, 60 * 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isFxRoute()) fx.refresh();
+});
 store.onSaveError(() => toast('⚠️ 儲存失敗：瀏覽器儲存空間無法使用'));
 
 render();

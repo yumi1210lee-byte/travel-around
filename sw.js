@@ -1,7 +1,7 @@
 // Service worker：讓 App 在沒有網路時也能開啟。
 // 策略：先用快取立即顯示，同時在背景向網路抓新版本更新快取（stale-while-revalidate）。
 // 修改檔案清單時記得調高版本號。
-const CACHE = 'travel-around-v1';
+const CACHE = 'travel-around-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,8 @@ const ASSETS = [
   './js/app.js',
   './js/constants.js',
   './js/forms.js',
+  './js/fx.js',
+  './js/fxview.js',
   './js/icons.js',
   './js/sample.js',
   './js/store.js',
