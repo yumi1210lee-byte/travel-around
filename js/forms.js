@@ -126,12 +126,7 @@ export const FORMS = {
     title: '行程',
     fields: [
       { name: 'title', label: '名稱', required: true, placeholder: '例：明治神宮、拉麵、搭新幹線' },
-      {
-        name: 'category',
-        label: '類別',
-        type: 'select',
-        options: PLAN_CATEGORIES.map((c) => ({ value: c.value, label: `${c.emoji} ${c.label}` })),
-      },
+      { name: 'category', label: '類別', type: 'choice', options: PLAN_CATEGORIES },
       {
         row: [
           { name: 'date', label: '日期', type: 'date' },
@@ -154,6 +149,16 @@ function renderField(field, values) {
   const value = values[field.name] ?? '';
   const id = `f-${field.name}`;
   const label = `${h(field.label)}${field.required ? ' <i aria-hidden="true">*</i>' : ''}`;
+
+  if (field.type === 'choice') {
+    const options = field.options
+      .map(
+        (o) =>
+          `<label><input type="radio" name="${field.name}" value="${h(o.value)}" ${o.value === value ? 'checked' : ''}><span>${icon(o.icon)}${h(o.label)}</span></label>`,
+      )
+      .join('');
+    return `<fieldset class="field"><legend class="field-label">${label}</legend><div class="choice-picker">${options}</div></fieldset>`;
+  }
 
   if (field.type === 'icon') {
     const options = TRIP_ICONS.map(

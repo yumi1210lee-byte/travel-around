@@ -531,7 +531,7 @@ document.addEventListener('visibilitychange', () => {
   if (isFxRoute()) fx.refresh();
   sync.refreshFollowed();
 });
-store.onSaveError(() => toast('⚠️ 儲存失敗：瀏覽器儲存空間無法使用'));
+store.onSaveError(() => toast('儲存失敗：瀏覽器儲存空間無法使用'));
 
 render();
 sync.checkPending({ retryFailed: true });

@@ -35,14 +35,21 @@ export function quickAmounts(currency, rates) {
 
 const label = (code) => {
   const info = CURRENCY_INFO[code];
-  return info ? `${info.flag} ${code} ${info.name}` : code;
+  return info ? `${code} ${info.name}` : code;
 };
+
+/** 貨幣符號圓標（取代國旗 emoji） */
+export function currencyBadge(code) {
+  const symbol = CURRENCY_INFO[code]?.symbol || code.slice(0, 2);
+  const size = symbol.length >= 3 ? 'is-long' : symbol.length === 2 ? 'is-mid' : '';
+  return `<span class="cur-badge ${size}" aria-hidden="true">${h(symbol)}</span>`;
+}
 
 function currencySelect(name, value) {
   const list = CURRENCIES.includes(value) ? CURRENCIES : [value, ...CURRENCIES];
-  const info = CURRENCY_INFO[value] || { flag: '💱', name: '' };
+  const info = CURRENCY_INFO[value] || { name: '' };
   return `<label class="fx-cur">
-    <span class="fx-flag" aria-hidden="true">${info.flag}</span>
+    ${currencyBadge(value)}
     <span><span class="fx-code">${h(value)}</span><span class="fx-name">${h(info.name)}</span></span>
     ${icon('chevron')}
     <select data-change="${name}" aria-label="${name === 'fx-from' ? '原幣別' : '換算幣別'}">

@@ -35,9 +35,9 @@ const ext = 'target="_blank" rel="noopener noreferrer"';
 
 const routeText = (f) => `${f.from || f.fromCity || '?'} → ${f.to || f.toCity || '?'}`;
 
-function emptyState(emoji, title, text, action = '') {
+function emptyState(iconName, title, text, action = '') {
   return `<div class="empty">
-    <div class="empty-emoji" aria-hidden="true">${emoji}</div>
+    <div class="empty-icon" aria-hidden="true">${icon(iconName)}</div>
     <h3>${title}</h3>
     <p>${text}</p>
     ${action}
@@ -77,7 +77,7 @@ function tripCard(trip, today) {
     </div>
     <span class="trip-badges">
       <span class="badge badge-${status.state}">${h(statusLabel(status))}</span>
-      ${trip.follow ? '<span class="badge">🔄 同步中</span>' : trip.share ? '<span class="badge">🔗 已分享</span>' : ''}
+      ${trip.follow ? `<span class="badge badge-icon">${icon('refresh')}同步中</span>` : trip.share ? `<span class="badge badge-icon">${icon('link')}已分享</span>` : ''}
     </span>
   </a>`;
 }
@@ -104,7 +104,7 @@ export function renderHome(data) {
       section('未定日期', groups.undated) +
       section('旅行回憶', groups.past)
     : emptyState(
-        '🧳',
+        'luggage',
         '還沒有旅程',
         '建立第一趟旅程，把航班、住宿和行程都收在一起。',
         `<div class="row-btns center">
@@ -150,9 +150,9 @@ function followBanner(trip, full) {
       offline: `目前沒有網路，顯示的是 ${syncTime(f.remoteUpdatedAt)} 的版本`,
       error: `暫時無法檢查更新，顯示的是 ${syncTime(f.remoteUpdatedAt)} 的版本`,
     }[f.status] || `對方修改後會自動更新・最後更新 ${syncTime(f.remoteUpdatedAt)}`;
-  if (!full) return `<p class="follow-slim">🔄 同步中的旅程（唯讀）・${h(status)}</p>`;
+  if (!full) return `<p class="follow-slim">${icon('refresh')}<span>同步中的旅程（唯讀）・${h(status)}</span></p>`;
   return `<section class="card follow-banner ${f.status === 'gone' ? 'is-gone' : ''}">
-    <p><b>🔄 別人分享給你的旅程</b></p>
+    <p class="title-with-icon"><b>${icon('refresh')}別人分享給你的旅程</b></p>
     <p class="muted small">${h(status)}。這趟旅程是唯讀的，行李清單可以自己勾選。</p>
     <div class="row-btns">
       ${f.status === 'gone' ? '' : '<button class="btn" data-action="follow-refresh">檢查更新</button>'}
@@ -209,7 +209,7 @@ function hero(trip, status) {
       return `<section class="hero">
         <div><p class="hero-label">${status.days === 1 ? '明天就出發！' : '距離出發還有'}</p>
         <p class="hero-sub">${start} 出發・共 ${status.total} 天</p></div>
-        ${status.days === 1 ? '<div class="hero-big">🎉</div>' : `<div class="hero-big">${status.days}<small>天</small></div>`}
+        ${status.days === 1 ? `<div class="hero-big">${icon('sparkles', 'hero-icon')}</div>` : `<div class="hero-big">${status.days}<small>天</small></div>`}
       </section>`;
     case 'ongoing':
       return `<section class="hero">
@@ -219,7 +219,7 @@ function hero(trip, status) {
     case 'past':
       return `<section class="hero is-past">
         <div><p class="hero-label">旅程已結束</p><p class="hero-sub">${start} 出發・共 ${status.total} 天</p></div>
-        <div class="hero-big">📷</div>
+        <div class="hero-big">${icon('camera', 'hero-icon')}</div>
       </section>`;
     default:
       return `<section class="hero is-past">
@@ -252,7 +252,7 @@ function entryInfo(entry) {
       const [arrDate, arrTime] = splitDateTime(r.arriveAt);
       endTime = arrTime;
       endShift = depDate && arrDate ? diffDays(depDate, arrDate) : 0;
-      emoji = '🛫';
+      emoji = 'takeoff';
       title = routeText(r);
       sub = [[normalizeFlightNo(r.flightNo), r.airline].filter(Boolean).join(' '), terminalText(r)]
         .filter(Boolean)
@@ -260,23 +260,23 @@ function entryInfo(entry) {
       break;
     }
     case 'arrival':
-      emoji = '🛬';
+      emoji = 'landing';
       title = `抵達 ${r.toCity || r.to || ''}`;
       sub = [normalizeFlightNo(r.flightNo), routeText(r), r.arrivalTerminal && `航廈 ${r.arrivalTerminal}`]
         .filter(Boolean)
         .join('・');
       break;
     case 'checkin':
-      emoji = '🏨';
+      emoji = 'bed';
       title = `入住 ${r.name}`;
       sub = r.address;
       break;
     case 'checkout':
-      emoji = '🧳';
+      emoji = 'luggage';
       title = `退房 ${r.name}`;
       break;
     default:
-      emoji = (Object.hasOwn(CATEGORY, r.category) && CATEGORY[r.category].emoji) || '📍';
+      emoji = (Object.hasOwn(CATEGORY, r.category) && CATEGORY[r.category].icon) || 'pin';
       title = r.title;
       sub = r.location;
   }
@@ -298,7 +298,7 @@ function timelineEntry(entry) {
   const { emoji, title, sub, endTime, endShift } = entryInfo(entry);
   return `<li><button class="tl-item kind-${entry.kind}" ${editAttrs(entry.coll, r.id)}>
     ${timeCell('tl-time', entry.time, endTime, endShift)}
-    <span class="tl-icon" aria-hidden="true">${emoji}</span>
+    <span class="tl-icon" aria-hidden="true">${icon(emoji)}</span>
     <span class="tl-body"><b>${h(title)}</b>${sub ? `<small>${h(sub)}</small>` : ''}</span>
   </button></li>`;
 }
@@ -383,7 +383,7 @@ function membersCard(trip) {
   if (!list.length && READ_ONLY) return '';
   return `<section class="card members">
     <header class="card-title-row">
-      <h2 class="card-title">👥 同行成員</h2>
+      <h2 class="card-title title-with-icon">${icon('users')}同行成員</h2>
       ${list.length ? `<span class="muted small">${list.length} 人</span>` : ''}
     </header>
     ${list.length
@@ -504,7 +504,7 @@ function flightCard(f) {
 function flights(trip) {
   if (!trip.flights.length) {
     return emptyState(
-      '✈️',
+      'plane',
       '還沒有航班',
       '記下航班編號、起降時間、航廈、座位和訂位代號，出發當天一目了然。',
       editable(`<button class="btn primary" data-action="add" data-coll="flights">${icon('plus')}新增航班</button>`),
@@ -548,7 +548,7 @@ function stayCard(s, today) {
 function stays(trip) {
   if (!trip.stays.length) {
     return emptyState(
-      '🏨',
+      'bed',
       '還沒有住宿',
       '存下地址、入住退房時間和訂房編號，一鍵開地圖導航。',
       editable(`<button class="btn primary" data-action="add" data-coll="stays">${icon('plus')}新增住宿</button>`),
@@ -565,7 +565,7 @@ function planItem(p) {
   return `<li class="plan">
     <button class="plan-main" ${editAttrs('plans', p.id)}>
       <span class="plan-time">${h(p.time || '')}</span>
-      <span class="plan-cat" aria-hidden="true">${cat.emoji}</span>
+      <span class="plan-cat" aria-hidden="true">${icon(cat.icon)}</span>
       <span class="plan-body">
         <b>${h(p.title)}</b>
         ${p.location ? `<small>${h(p.location)}</small>` : ''}
@@ -589,7 +589,7 @@ function linkedItem(entry) {
   return `<li class="plan is-linked kind-${entry.kind}">
     <button class="plan-main" ${editAttrs(entry.coll, r.id)}>
       ${timeCell('plan-time', entry.time, endTime, endShift)}
-      <span class="plan-cat" aria-hidden="true">${emoji}</span>
+      <span class="plan-cat" aria-hidden="true">${icon(emoji)}</span>
       <span class="plan-body"><b>${h(title)}</b>${sub ? `<small>${h(sub)}</small>` : ''}</span>
       <span class="plan-tag">${tag}</span>
     </button>
@@ -604,7 +604,7 @@ function plans(trip) {
   const timeline = buildTimeline(trip);
   if (!timeline.days.length && !timeline.undated.length) {
     return emptyState(
-      '🗺️',
+      'map',
       '還沒有行程',
       '新增想去的景點、餐廳和交通安排，會自動依日期與時間排序。',
       editable(`<button class="btn primary" data-action="add" data-coll="plans">${icon('plus')}新增行程</button>`),
@@ -719,7 +719,7 @@ export function renderSettings(data) {
         <h2 class="card-title">主要幣別</h2>
         <p class="muted small">新增航班、住宿、行程時預先帶入，也是花費換算的目標幣別。</p>
         <select data-change="currency" aria-label="預設幣別">
-          ${CURRENCIES.map((c) => `<option value="${c}" ${c === data.settings.currency ? 'selected' : ''}>${CURRENCY_INFO[c].flag} ${c} ${CURRENCY_INFO[c].name}</option>`).join('')}
+          ${CURRENCIES.map((c) => `<option value="${c}" ${c === data.settings.currency ? 'selected' : ''}>${c} ${CURRENCY_INFO[c].name}</option>`).join('')}
         </select>
       </section>
 
@@ -761,7 +761,7 @@ export function renderShareImport(state, existing, env) {
       'not-found': '這份分享已經停止，或連結不完整。可以請對方重新分享一次。',
     }[state.error] || '連結可能不完整。請確認整段連結都有複製到，或請對方重新分享一次。';
     body = emptyState(
-      '🔗',
+      'link',
       '無法讀取這個分享連結',
       text,
       `<div class="row-btns center">

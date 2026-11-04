@@ -235,7 +235,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .state-past { opacity: 0.72; }
 
 .empty { text-align: center; padding: 48px 20px; }
-.empty-emoji { font-size: 52px; line-height: 1; }
+.empty-icon {
+  display: grid; place-items: center; width: 76px; height: 76px; margin: 0 auto;
+  border-radius: 24px; background: var(--sky-soft); color: var(--accent-strong);
+}
+.empty-icon .icon { width: 34px; height: 34px; stroke-width: 1.75; }
 .empty h3 { margin-top: 14px; font-size: 18px; }
 .empty p { margin: 6px auto 18px; max-width: 320px; color: var(--muted); font-size: 14px; }
 
@@ -296,7 +300,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .tl-item { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 8px 4px; border-radius: 10px; text-align: left; }
 .tl-item:hover { background: var(--surface-2); }
 .tl-time { width: 44px; flex: none; padding-top: 1px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.tl-icon { width: 24px; flex: none; text-align: center; }
+.tl-icon { width: 24px; flex: none; display: grid; place-items: center; padding-top: 1px; color: var(--accent); }
+.tl-icon .icon, .plan-cat .icon { width: 18px; height: 18px; }
+.kind-checkin .tl-icon, .kind-checkout .tl-icon, .kind-checkin .plan-cat, .kind-checkout .plan-cat { color: var(--warm); }
 .tl-body { flex: 1; min-width: 0; }
 .tl-body b { display: block; font-weight: 600; }
 .tl-body small { display: block; font-size: 13px; color: var(--muted); }
@@ -350,7 +356,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .plan { display: flex; align-items: center; gap: 2px; padding-right: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
 .plan-main { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 8px; padding: 12px; text-align: left; }
 .plan-time { width: 44px; flex: none; padding-top: 1px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.plan-cat { width: 22px; flex: none; text-align: center; }
+.plan-cat { width: 22px; flex: none; display: grid; place-items: center; padding-top: 1px; color: var(--accent); }
 .plan-body { flex: 1; min-width: 0; }
 .plan-body b { display: block; font-weight: 600; }
 .plan-body small { display: block; font-size: 13px; color: var(--muted); }
@@ -381,7 +387,15 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .fx-cur { position: relative; display: flex; align-items: center; gap: 8px; flex: none; padding: 6px 8px; border-radius: 12px; }
 .fx-cur:hover { background: var(--glass); }
 .fx-cur select { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; opacity: 0; cursor: pointer; }
-.fx-flag { font-size: 26px; line-height: 1; }
+/* 貨幣符號圓標（取代國旗） */
+.cur-badge {
+  display: grid; place-items: center; flex: none;
+  width: 36px; height: 36px; border-radius: 999px;
+  border: 1.75px solid currentColor; font-weight: 800; font-size: 16px; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.cur-badge.is-mid { font-size: 13px; }
+.cur-badge.is-long { font-size: 10.5px; }
 .fx-code { display: block; font-size: 17px; font-weight: 800; line-height: 1.2; }
 .fx-name { display: block; font-size: 11px; color: var(--hero-ink-soft); white-space: nowrap; }
 .fx-cur .icon { width: 14px; height: 14px; color: var(--hero-ink-soft); }
@@ -582,3 +596,33 @@ fieldset.field { border: 0; padding: 0; }
 /* 航班卡片：出發／抵達航廈寫在各自的時間下面 */
 .pass-end .terminal { margin-top: 2px; font-size: 12px; color: var(--muted); }
 .pass-end .terminal b { color: var(--text); font-weight: 700; }
+
+/* ───────────── 線條圖示（取代 emoji） ───────────── */
+.title-with-icon { display: flex; align-items: center; gap: 6px; }
+.title-with-icon > b { display: inline-flex; align-items: center; gap: 6px; }
+.title-with-icon .icon { width: 1.1em; height: 1.1em; flex: none; color: var(--accent); }
+p.title-with-icon { align-items: flex-start; }
+p.title-with-icon > .icon { margin-top: 0.2em; }
+.share-status.is-ok .icon { color: var(--accent); }
+.share-status.is-warn, .share-status.is-warn .icon, .share-error .icon { color: var(--danger); }
+.share-tip .title-with-icon .icon, .notice .icon { color: var(--accent); }
+.hero-icon { width: 46px; height: 46px; stroke-width: 1.6; }
+.badge-icon { display: inline-flex; align-items: center; gap: 4px; }
+.badge-icon .icon { width: 12px; height: 12px; }
+.follow-slim { display: flex; align-items: flex-start; gap: 6px; }
+.follow-slim .icon { width: 15px; height: 15px; margin-top: 2px; flex: none; color: var(--accent); }
+.share-list li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.share-list .icon { width: 16px; height: 16px; align-self: center; color: var(--accent); }
+
+/* 行程類別：帶圖示的選項按鈕 */
+.choice-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice-picker label { position: relative; cursor: pointer; }
+.choice-picker input { position: absolute; opacity: 0; pointer-events: none; }
+.choice-picker span {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px;
+  border-radius: 999px; background: var(--surface-2); border: 2px solid transparent;
+  font-size: 14px; font-weight: 600; color: var(--muted);
+}
+.choice-picker .icon { width: 17px; height: 17px; }
+.choice-picker input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.choice-picker input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
