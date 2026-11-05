@@ -47,6 +47,14 @@ python3 -m http.server 8000
 
 然後打開 <http://localhost:8000>。
 
+### 部署失敗怎麼辦
+
+每次推送到 GitHub，Pages 會自動重新部署（約 1 分鐘）。到專案的 **Actions** 分頁看「pages build and deployment」：
+
+- ✅ 綠色勾勾：部署成功。手機上的 App 關掉再打開一次就會看到新版
+- ❌ 紅色叉叉，而且 deploy 步驟顯示 `updating_pages` 後 `Timeout reached`：這是 GitHub Pages 服務端偶爾會卡住，跟程式無關。點進那次執行，按右上角 **Re-run all jobs** 重跑即可
+- 重跑後一直停在「Queued」、取消也取消不了：那次重跑卡住了，推一個新的 commit 就會產生一次全新的部署
+
 ## 備份很重要
 
 資料存在瀏覽器裡，以下情況可能會遺失：清除瀏覽器資料、換手機、刪掉主畫面的 App。
