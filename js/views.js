@@ -372,6 +372,7 @@ function memberRow(m) {
       <span class="member-body">
         <b>${h(m.name)}</b>
         ${m.englishName ? `<small class="mono">${h(m.englishName)}</small>` : ''}
+        ${m.phone ? `<small class="member-phone">${icon('phone')}<span>${h(m.phone)}</span></small>` : ''}
         ${m.notes ? `<small class="clamp">${h(m.notes)}</small>` : ''}
       </span>
     </button>
