@@ -231,10 +231,12 @@ function hero(trip, status) {
 
 /** 出發／抵達航廈：「航廈 T2 → T1」，只有一邊時寫清楚是哪一邊 */
 function terminalText(f) {
-  if (f.terminal && f.arrivalTerminal) return `航廈 ${f.terminal} → ${f.arrivalTerminal}`;
-  if (f.terminal) return `出發航廈 ${f.terminal}`;
-  if (f.arrivalTerminal) return `抵達航廈 ${f.arrivalTerminal}`;
-  return '';
+  let text = '';
+  if (f.terminal && f.arrivalTerminal) text = `航廈 ${f.terminal} → ${f.arrivalTerminal}`;
+  else if (f.terminal) text = `出發航廈 ${f.terminal}`;
+  else if (f.arrivalTerminal) text = `抵達航廈 ${f.arrivalTerminal}`;
+  // 用不換行空格，整段一起換行，避免「T1」單獨掉到下一行
+  return text.replace(/ /g, '\u00a0');
 }
 
 /** 時間軸上每一項的圖示、標題與副標（總覽和行程分頁共用） */
